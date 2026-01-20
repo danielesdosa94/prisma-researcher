@@ -28,7 +28,7 @@ class HeaderSection(ft.Container):
         # Logo/Icon
         logo = ft.Container(
             content=ft.Icon(
-                ft.icons.AUTO_AWESOME,
+                "auto_awesome",
                 size=32,
                 color=COLORS.PRIMARY,
             ),
@@ -86,7 +86,7 @@ class InputSection(ft.Container):
             content=ft.Row(
                 controls=[
                     ft.Icon(
-                        ft.icons.LINK_ROUNDED,
+                        "link_rounded",
                         size=16,
                         color=COLORS.TEXT_SECONDARY,
                     ),
@@ -149,7 +149,7 @@ class TerminalSection(ft.Container):
         # View report button (hidden initially)
         self.view_report_btn = PrismaButton(
             text="Ver Reporte Final",
-            icon=ft.icons.DESCRIPTION_ROUNDED,
+            icon="description_rounded",
             variant="primary",
             expand=True,
         )
@@ -220,7 +220,7 @@ class ControlPanel(ft.Container):
         self.ai_status = ft.Row(
             controls=[
                 ft.Icon(
-                    ft.icons.MEMORY_ROUNDED,
+                    "memory_rounded",
                     size=16,
                     color=COLORS.TEXT_MUTED,
                 ),
@@ -239,7 +239,7 @@ class ControlPanel(ft.Container):
         # Execute button
         self.execute_btn = PrismaButton(
             text="EJECUTAR INVESTIGACIÓN",
-            icon=ft.icons.ROCKET_LAUNCH_ROUNDED,
+            icon="rocket_launch_rounded",
             variant="primary",
             expand=True,
             on_click=self._handle_execute,
@@ -334,8 +334,8 @@ class ControlPanel(ft.Container):
             available: Whether AI is ready to use
         """
         color = COLORS.SUCCESS if available else COLORS.TEXT_MUTED
-        icon = ft.icons.CHECK_CIRCLE_ROUNDED if available else ft.icons.MEMORY_ROUNDED
-        
+        icon = "check_circle_rounded" if available else "memory_rounded"
+
         self.ai_status.controls[0].name = icon
         self.ai_status.controls[0].color = color
         self.ai_status.controls[1].value = status
@@ -346,7 +346,7 @@ class ControlPanel(ft.Container):
         """Toggle button state during execution."""
         self.execute_btn.disabled = executing
         self.execute_btn.text = "PROCESANDO..." if executing else "EJECUTAR INVESTIGACIÓN"
-        self.execute_btn.icon = ft.icons.HOURGLASS_TOP_ROUNDED if executing else ft.icons.ROCKET_LAUNCH_ROUNDED
+        self.execute_btn.icon = "hourglass_top_rounded" if executing else "rocket_launch_rounded"
         self.execute_btn.update()
     
     def show_progress(self, value: float, label: str = "Descargando modelo...") -> None:

@@ -284,7 +284,7 @@ class DragDropZone(ft.Container):
         
         # Main content
         self.drop_icon = ft.Icon(
-            ft.icons.UPLOAD_FILE_ROUNDED,
+            "upload_file_rounded",
             size=48,
             color=COLORS.TEXT_MUTED,
         )
@@ -298,7 +298,7 @@ class DragDropZone(ft.Container):
         
         self.browse_button = PrismaButton(
             text="Seleccionar Archivos",
-            icon=ft.icons.FOLDER_OPEN_ROUNDED,
+            icon="folder_open_rounded",
             variant="secondary",
             on_click=lambda _: self.file_picker.pick_files(
                 allow_multiple=True,
@@ -459,7 +459,7 @@ class StatusBar(ft.Container):
                     ft.Row(
                         controls=[
                             ft.Icon(
-                                ft.icons.CIRCLE,
+                                "circle",
                                 size=8,
                                 color=COLORS.SUCCESS,
                             ),
