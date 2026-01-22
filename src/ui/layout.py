@@ -109,7 +109,6 @@ class InputSection(ft.Container):
                         size=TYPOGRAPHY.SIZE_XS,
                         weight=ft.FontWeight.W_600,
                         color=COLORS.TEXT_MUTED,
-                        letter_spacing=1,
                     ),
                     self.drag_drop_zone,
                     self.items_counter,
@@ -145,7 +144,7 @@ class TerminalSection(ft.Container):
     
     def __init__(self):
         self.terminal = TerminalLog(height=350)
-        
+
         # View report button (hidden initially)
         self.view_report_btn = PrismaButton(
             text="Ver Reporte Final",
@@ -163,7 +162,6 @@ class TerminalSection(ft.Container):
                         size=TYPOGRAPHY.SIZE_XS,
                         weight=ft.FontWeight.W_600,
                         color=COLORS.TEXT_MUTED,
-                        letter_spacing=1,
                     ),
                     self.terminal,
                     self.view_report_btn,
@@ -208,13 +206,14 @@ class ControlPanel(ft.Container):
     ):
         self.on_execute = on_execute
         self.on_mode_change = on_mode_change
-        
-        # Mode switches
+
+        # Mode switches - create without on_change
         self.ai_switch = PrismaSwitch(
             label="Análisis con IA",
             value=False,
-            on_change=self._handle_mode_change,
         )
+        # Set handler after initialization
+        self.ai_switch.switch.on_change = self._handle_mode_change
         
         # AI status indicator
         self.ai_status = ft.Row(
@@ -235,15 +234,16 @@ class ControlPanel(ft.Container):
         
         # Progress indicator for model download
         self.progress = ProgressIndicator(label="Descargando modelo...")
-        
-        # Execute button
+
+        # Execute button - create without on_click
         self.execute_btn = PrismaButton(
             text="EJECUTAR INVESTIGACIÓN",
             icon="rocket_launch_rounded",
             variant="primary",
             expand=True,
-            on_click=self._handle_execute,
         )
+        # Set handler after initialization
+        self.execute_btn.on_click = self._handle_execute
         
         super().__init__(
             content=ft.Column(
@@ -258,7 +258,6 @@ class ControlPanel(ft.Container):
                                             size=TYPOGRAPHY.SIZE_XS,
                                             weight=ft.FontWeight.W_600,
                                             color=COLORS.TEXT_MUTED,
-                                            letter_spacing=1,
                                         ),
                                         ft.Row(
                                             controls=[
@@ -304,19 +303,20 @@ class ControlPanel(ft.Container):
             margin=ft.margin.symmetric(horizontal=SPACING.MD),
         )
         
-        # Radio group
+        # Radio group - create without on_change
         self.mode_group = ft.RadioGroup(
             value="scrape",
-            on_change=self._handle_mode_change,
             content=self.content.controls[0].content.controls[0].controls[1],
         )
+        # Set handler after initialization
+        self.mode_group.on_change = self._handle_mode_change
     
     def _handle_mode_change(self, e: ft.ControlEvent) -> None:
         """Handle mode selection change."""
         if self.on_mode_change:
             self.on_mode_change(e.control.value if hasattr(e.control, 'value') else "scrape")
     
-    def _handle_execute(self, e: ft.ControlEvent) -> None:
+    def _handle_execute(self, _e: ft.ControlEvent) -> None:
         """Handle execute button click."""
         if self.on_execute:
             self.on_execute()

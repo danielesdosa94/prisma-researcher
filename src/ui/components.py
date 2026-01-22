@@ -15,16 +15,16 @@ from src.ui.theme import COLORS, TYPOGRAPHY, SPACING
 class PrismaButton(ft.ElevatedButton):
     """
     Primary action button with PRISMA styling.
-    
+
     Args:
         text: Button label
         on_click: Click handler callback
-        icon: Optional icon (ft.icons.XXXX)
+        icon: Optional icon (string literal like "search" or "settings")
         disabled: Whether button is disabled
         expand: Whether to expand to fill container
         variant: 'primary' | 'secondary' | 'ghost'
     """
-    
+
     def __init__(
         self,
         text: str,
@@ -44,11 +44,9 @@ class PrismaButton(ft.ElevatedButton):
         else:  # ghost
             bg_color = "transparent"
             text_color = COLORS.TEXT_SECONDARY
-        
+
+        # Call parent constructor with minimal args
         super().__init__(
-            text=text,
-            icon=icon,
-            on_click=on_click,
             disabled=disabled,
             expand=expand,
             height=SPACING.BUTTON_HEIGHT,
@@ -67,11 +65,17 @@ class PrismaButton(ft.ElevatedButton):
             ),
         )
 
+        # Set properties after initialization to avoid version conflicts
+        self.text = text
+        self.icon = icon
+        if on_click:
+            self.on_click = on_click
+
 
 class PrismaTextField(ft.TextField):
     """
     Styled text input field for PRISMA.
-    
+
     Args:
         label: Field label
         hint_text: Placeholder text
@@ -79,7 +83,7 @@ class PrismaTextField(ft.TextField):
         multiline: Enable multiline input
         password: Mask input as password
     """
-    
+
     def __init__(
         self,
         label: Optional[str] = None,
@@ -90,9 +94,6 @@ class PrismaTextField(ft.TextField):
         expand: bool = False,
     ):
         super().__init__(
-            label=label,
-            hint_text=hint_text,
-            on_change=on_change,
             multiline=multiline,
             password=password,
             expand=expand,
@@ -109,17 +110,25 @@ class PrismaTextField(ft.TextField):
             border_radius=SPACING.RADIUS_MD,
         )
 
+        # Set properties after initialization
+        if label:
+            self.label = label
+        if hint_text:
+            self.hint_text = hint_text
+        if on_change:
+            self.on_change = on_change
+
 
 class PrismaSwitch(ft.Container):
     """
     Toggle switch with label for PRISMA.
-    
+
     Args:
         label: Switch label
         value: Initial state
         on_change: Change handler
     """
-    
+
     def __init__(
         self,
         label: str,
@@ -130,9 +139,11 @@ class PrismaSwitch(ft.Container):
             value=value,
             active_color=COLORS.PRIMARY,
             inactive_track_color=COLORS.SURFACE_BORDER,
-            on_change=on_change,
         )
-        
+        # Set handler after initialization
+        if on_change:
+            self.switch.on_change = on_change
+
         super().__init__(
             content=ft.Row(
                 controls=[
@@ -147,11 +158,11 @@ class PrismaSwitch(ft.Container):
             ),
             padding=ft.padding.symmetric(vertical=SPACING.SM),
         )
-    
+
     @property
     def value(self) -> bool:
         return self.switch.value
-    
+
     @value.setter
     def value(self, val: bool):
         self.switch.value = val
@@ -263,7 +274,6 @@ class DragDropZone(ft.Container):
         
         # URL input field
         self.url_input = ft.TextField(
-            hint_text="Pega URLs aquí (una por línea)...",
             multiline=True,
             min_lines=3,
             max_lines=5,
@@ -274,13 +284,15 @@ class DragDropZone(ft.Container):
             cursor_color=COLORS.PRIMARY,
             hint_style=ft.TextStyle(color=COLORS.TEXT_MUTED),
             border_radius=SPACING.RADIUS_SM,
-            on_change=self._handle_url_change,
         )
-        
-        # File picker
-        self.file_picker = ft.FilePicker(
-            on_result=self._handle_file_result,
-        )
+        # Set properties after initialization
+        self.url_input.hint_text = "Pega URLs aquí (una por línea)..."
+        self.url_input.on_change = self._handle_url_change
+
+        # File picker - create without on_result argument
+        self.file_picker = ft.FilePicker()
+        # Set handler after initialization to avoid version conflicts
+        self.file_picker.on_result = self._handle_file_result
         
         # Main content
         self.drop_icon = ft.Icon(
@@ -295,15 +307,17 @@ class DragDropZone(ft.Container):
             color=COLORS.TEXT_SECONDARY,
             text_align=ft.TextAlign.CENTER,
         )
-        
+
+        # Create button without on_click to avoid lambda issues
         self.browse_button = PrismaButton(
             text="Seleccionar Archivos",
             icon="folder_open_rounded",
             variant="secondary",
-            on_click=lambda _: self.file_picker.pick_files(
-                allow_multiple=True,
-                allowed_extensions=["txt", "docx"]
-            ),
+        )
+        # Set click handler after initialization
+        self.browse_button.on_click = lambda _: self.file_picker.pick_files(
+            allow_multiple=True,
+            allowed_extensions=["txt", "docx"]
         )
         
         super().__init__(
