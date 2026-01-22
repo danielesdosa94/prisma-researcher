@@ -1,31 +1,12 @@
 """
-PRISMA - UI Components
-======================
-Reusable UI components following the PRISMA design system.
-All components use the centralized theme configuration.
+PRISMA - UI Components (Safe Mode)
 """
-
 from typing import Callable, Optional, List
 from datetime import datetime
 import flet as ft
-
 from src.ui.theme import COLORS, TYPOGRAPHY, SPACING
 
-
 class PrismaButton(ft.Container):
-    """
-    Primary action button with PRISMA styling.
-    Uses Container for maximum compatibility across Flet versions.
-
-    Args:
-        text: Button label
-        on_click: Click handler callback
-        icon: Optional icon (string literal like "search" or "settings")
-        disabled: Whether button is disabled
-        expand: Whether to expand to fill container
-        variant: 'primary' | 'secondary' | 'ghost'
-    """
-
     def __init__(
         self,
         text: str,
@@ -35,30 +16,21 @@ class PrismaButton(ft.Container):
         expand: bool = False,
         variant: str = "primary"
     ):
-        # Determine colors based on variant
+        # 1. Definir colores
         if variant == "primary":
             bg_color = COLORS.PRIMARY
-            hover_color = COLORS.PRIMARY_HOVER
             text_color = COLORS.TEXT_ON_PRIMARY
+            hover_color = COLORS.PRIMARY_HOVER
         elif variant == "secondary":
             bg_color = COLORS.SURFACE
-            hover_color = COLORS.SURFACE_HOVER
             text_color = COLORS.TEXT_PRIMARY
-        else:  # ghost
-            bg_color = "transparent"
             hover_color = COLORS.SURFACE_HOVER
+        else:
+            bg_color = "transparent"
             text_color = COLORS.TEXT_SECONDARY
+            hover_color = COLORS.SURFACE_HOVER
 
-        # Store properties
-        self._text = text
-        self._icon = icon
-        self._text_color = text_color
-        self._bg_color = bg_color
-        self._hover_color = hover_color
-        self._disabled = disabled
-        self._on_click = on_click
-
-        # Build content with icon and text
+        # 2. Construir contenido visual
         content_controls = []
         if icon:
             content_controls.append(ft.Icon(icon, size=18, color=text_color))
@@ -66,88 +38,37 @@ class PrismaButton(ft.Container):
             ft.Text(text, size=14, weight=ft.FontWeight.W_500, color=text_color)
         )
 
-        button_content = ft.Row(
-            controls=content_controls,
-            spacing=8,
-            alignment=ft.MainAxisAlignment.CENTER,
-            tight=True,
-        )
-
-        # Create container with button styling
+        # 3. Inicializar Container SOLO con propiedades visuales
         super().__init__(
-            content=button_content,
+            content=ft.Row(
+                controls=content_controls,
+                spacing=8,
+                alignment=ft.MainAxisAlignment.CENTER,
+                tight=True,
+            ),
             bgcolor=COLORS.SURFACE if disabled else bg_color,
             border_radius=SPACING.RADIUS_MD,
             padding=ft.padding.symmetric(horizontal=SPACING.LG, vertical=12),
             height=SPACING.BUTTON_HEIGHT,
             expand=expand,
-            ink=not disabled,  # Ripple effect
-            on_hover=self._handle_hover if not disabled else None,
+            ink=not disabled,
         )
 
-        # Set click handler
+        # 4. Asignar evento DESPUÉS (Evita error 'unexpected keyword')
         if on_click and not disabled:
             self.on_click = on_click
+            
+        # Guardar colores para hover
+        self._bg_color = bg_color
+        self._hover_color = hover_color
+        if not disabled:
+            self.on_hover = self._handle_hover
 
-    def _handle_hover(self, e: ft.HoverEvent) -> None:
-        """Handle hover state for visual feedback."""
-        if e.data == "true":
-            self.bgcolor = self._hover_color
-        else:
-            self.bgcolor = self._bg_color
+    def _handle_hover(self, e):
+        self.bgcolor = self._hover_color if e.data == "true" else self._bg_color
         self.update()
 
-    @property
-    def text(self) -> str:
-        """Get button text."""
-        return self._text
-
-    @text.setter
-    def text(self, value: str) -> None:
-        """Set button text and update content."""
-        self._text = value
-        self._update_content()
-
-    @property
-    def icon(self) -> Optional[str]:
-        """Get button icon."""
-        return self._icon
-
-    @icon.setter
-    def icon(self, value: Optional[str]) -> None:
-        """Set button icon and update content."""
-        self._icon = value
-        self._update_content()
-
-    def _update_content(self) -> None:
-        """Update button content with current text and icon."""
-        content_controls = []
-        if self._icon:
-            content_controls.append(ft.Icon(self._icon, size=18, color=self._text_color))
-        content_controls.append(
-            ft.Text(self._text, size=14, weight=ft.FontWeight.W_500, color=self._text_color)
-        )
-
-        self.content = ft.Row(
-            controls=content_controls,
-            spacing=8,
-            alignment=ft.MainAxisAlignment.CENTER,
-            tight=True,
-        )
-
-
 class PrismaTextField(ft.TextField):
-    """
-    Styled text input field for PRISMA.
-
-    Args:
-        label: Field label
-        hint_text: Placeholder text
-        on_change: Change handler
-        multiline: Enable multiline input
-        password: Mask input as password
-    """
-
     def __init__(
         self,
         label: Optional[str] = None,
@@ -157,6 +78,7 @@ class PrismaTextField(ft.TextField):
         password: bool = False,
         expand: bool = False,
     ):
+        # Inicializar solo visuales
         super().__init__(
             label=label,
             hint_text=hint_text,
@@ -175,46 +97,27 @@ class PrismaTextField(ft.TextField):
             hint_style=ft.TextStyle(color=COLORS.TEXT_MUTED),
             border_radius=SPACING.RADIUS_MD,
         )
-
-        # Set event handlers AFTER initialization to avoid version conflicts
+        # Asignar evento después
         if on_change:
             self.on_change = on_change
 
-
 class PrismaSwitch(ft.Container):
-    """
-    Toggle switch with label for PRISMA.
-
-    Args:
-        label: Switch label
-        value: Initial state
-        on_change: Change handler
-    """
-
-    def __init__(
-        self,
-        label: str,
-        value: bool = False,
-        on_change: Optional[Callable] = None,
-    ):
+    def __init__(self, label: str, value: bool = False, on_change: Optional[Callable] = None):
+        # Crear switch sin evento
         self.switch = ft.Switch(
             value=value,
             active_color=COLORS.PRIMARY,
             inactive_track_color=COLORS.SURFACE_BORDER,
         )
-        # Set handler after initialization
+        # Asignar evento después
         if on_change:
             self.switch.on_change = on_change
-
+            
         super().__init__(
             content=ft.Row(
                 controls=[
                     self.switch,
-                    ft.Text(
-                        label,
-                        color=COLORS.TEXT_PRIMARY,
-                        size=TYPOGRAPHY.SIZE_BASE,
-                    ),
+                    ft.Text(label, color=COLORS.TEXT_PRIMARY, size=TYPOGRAPHY.SIZE_BASE),
                 ],
                 spacing=SPACING.SM,
             ),
@@ -225,361 +128,129 @@ class PrismaSwitch(ft.Container):
     def value(self) -> bool:
         return self.switch.value
 
-    @value.setter
-    def value(self, val: bool):
-        self.switch.value = val
-
-
 class TerminalLog(ft.Container):
-    """
-    Terminal-style log display component.
-    Shows real-time logs with timestamp and status colors.
-    """
-    
     def __init__(self, height: int = 300):
-        self.log_entries: List[ft.Control] = []
-        self.log_column = ft.Column(
-            controls=[],
-            spacing=2,
-            scroll=ft.ScrollMode.AUTO,
-            auto_scroll=True,
-        )
-        
+        self.log_column = ft.Column(spacing=2, scroll=ft.ScrollMode.AUTO, auto_scroll=True)
         super().__init__(
             content=self.log_column,
             bgcolor=COLORS.TERMINAL_BG,
             border_radius=SPACING.RADIUS_MD,
-            border=ft.Border.all(1, COLORS.SURFACE_BORDER) if hasattr(ft, 'Border') else ft.border.all(1, COLORS.SURFACE_BORDER),
+            border=ft.border.all(1, COLORS.SURFACE_BORDER),
             padding=SPACING.MD,
             height=height,
             expand=True,
         )
-    
-    def add_log(
-        self,
-        message: str,
-        status: str = "info",
-        prefix: str = ">"
-    ) -> None:
-        """
-        Add a log entry to the terminal.
-        
-        Args:
-            message: Log message
-            status: 'info' | 'success' | 'error' | 'warning' | 'ai'
-            prefix: Line prefix character
-        """
-        # Determine color based on status
+
+    def add_log(self, message: str, status: str = "info", prefix: str = ">") -> None:
         color_map = {
-            "info": COLORS.TEXT_SECONDARY,
-            "success": COLORS.SUCCESS,
-            "error": COLORS.ERROR,
-            "warning": COLORS.WARNING,
-            "ai": COLORS.PRIMARY,
+            "info": COLORS.TEXT_SECONDARY, "success": COLORS.SUCCESS,
+            "error": COLORS.ERROR, "warning": COLORS.WARNING, "ai": COLORS.PRIMARY
         }
         color = color_map.get(status, COLORS.TEXT_SECONDARY)
-        
-        # Create timestamp
         timestamp = datetime.now().strftime("%H:%M:%S")
         
-        # Create log entry
-        entry = ft.Row(
-            controls=[
-                ft.Text(
-                    f"[{timestamp}]",
-                    color=COLORS.TEXT_MUTED,
-                    size=TYPOGRAPHY.SIZE_XS,
-                    font_family=TYPOGRAPHY.FONT_MONO,
-                ),
-                ft.Text(
-                    f"{prefix} {message}",
-                    color=color,
-                    size=TYPOGRAPHY.SIZE_SM,
-                    font_family=TYPOGRAPHY.FONT_MONO,
-                    selectable=True,
-                ),
-            ],
-            spacing=SPACING.SM,
+        self.log_column.controls.append(
+            ft.Row([
+                ft.Text(f"[{timestamp}]", color=COLORS.TEXT_MUTED, size=TYPOGRAPHY.SIZE_XS, font_family=TYPOGRAPHY.FONT_MONO),
+                ft.Text(f"{prefix} {message}", color=color, size=TYPOGRAPHY.SIZE_SM, font_family=TYPOGRAPHY.FONT_MONO, selectable=True),
+            ], spacing=SPACING.SM)
         )
-        
-        self.log_entries.append(entry)
-        self.log_column.controls.append(entry)
+        if len(self.log_column.controls) > 500:
+            self.log_column.controls.pop(0)
+        if self.page: self.update()
 
-        # Keep only last 500 entries to prevent memory issues
-        if len(self.log_entries) > 500:
-            removed = self.log_entries.pop(0)
-            self.log_column.controls.remove(removed)
-
-        # Safe update - only if added to page
-        if self.page:
-            self.update()
-
-    def clear(self) -> None:
-        """Clear all log entries."""
-        self.log_entries.clear()
+    def clear(self):
         self.log_column.controls.clear()
-        # Safe update - only if added to page
-        if self.page:
-            self.update()
-
+        if self.page: self.update()
 
 class DragDropZone(ft.Container):
-    """
-    File drag-and-drop zone with visual feedback.
-    Accepts .txt, .docx files or URLs.
-    """
-    
-    def __init__(
-        self,
-        on_file_drop: Optional[Callable] = None,
-        on_url_paste: Optional[Callable] = None,
-    ):
+    def __init__(self, on_file_drop: Optional[Callable] = None, on_url_paste: Optional[Callable] = None):
         self.on_file_drop = on_file_drop
-        self.on_url_paste = on_url_paste
-        self.is_dragging = False
         
-        # URL input field - include hint_text in constructor for visibility
+        # --- CORRECCIÓN CRÍTICA ---
+        # 1. Crear FilePicker VACÍO (sin argumentos)
+        self.file_picker = ft.FilePicker()
+        # 2. Asignar evento después
+        self.file_picker.on_result = self._handle_file_result
+        
         self.url_input = ft.TextField(
             hint_text="Pega URLs aquí (una por línea)...",
             multiline=True,
-            min_lines=3,
-            max_lines=5,
+            min_lines=3, max_lines=5,
             border_color=COLORS.SURFACE_BORDER,
-            focused_border_color=COLORS.PRIMARY,
             bgcolor=COLORS.SURFACE,
             color=COLORS.TEXT_PRIMARY,
-            cursor_color=COLORS.PRIMARY,
-            hint_style=ft.TextStyle(color=COLORS.TEXT_MUTED),
-            border_radius=SPACING.RADIUS_SM,
+            text_size=12,
         )
-        # Set event handler AFTER initialization to avoid version conflicts
-        self.url_input.on_change = self._handle_url_change
+        
+        # Botón
+        self.browse_btn = PrismaButton(
+            "Seleccionar Archivos", 
+            icon="folder_open_rounded", 
+            variant="secondary"
+        )
+        # Asignar click después para evitar problemas de inicialización
+        self.browse_btn.on_click = lambda _: self.file_picker.pick_files(allow_multiple=True)
 
-        # File picker - create without on_result argument
-        self.file_picker = ft.FilePicker()
-        # Set handler after initialization to avoid version conflicts
-        self.file_picker.on_result = self._handle_file_result
-        
-        # Main content
-        self.drop_icon = ft.Icon(
-            "upload_file_rounded",
-            size=48,
-            color=COLORS.TEXT_MUTED,
-        )
-        
-        self.drop_text = ft.Text(
-            "Arrastra archivos .txt o .docx aquí",
-            size=TYPOGRAPHY.SIZE_BASE,
-            color=COLORS.TEXT_SECONDARY,
-            text_align=ft.TextAlign.CENTER,
-        )
-
-        # Create button without on_click to avoid lambda issues
-        self.browse_button = PrismaButton(
-            text="Seleccionar Archivos",
-            icon="folder_open_rounded",
-            variant="secondary",
-        )
-        # Set click handler after initialization
-        self.browse_button.on_click = lambda _: self.file_picker.pick_files(
-            allow_multiple=True,
-            allowed_extensions=["txt", "docx"]
-        )
-        
         super().__init__(
             content=ft.Column(
                 controls=[
-                    self.file_picker,
-                    self.drop_icon,
-                    self.drop_text,
-                    ft.Container(height=SPACING.SM),
-                    self.browse_button,
-                    ft.Container(height=SPACING.MD),
-                    ft.Text(
-                        "— o pega URLs directamente —",
-                        size=TYPOGRAPHY.SIZE_SM,
-                        color=COLORS.TEXT_MUTED,
-                    ),
-                    ft.Container(height=SPACING.SM),
+                    self.file_picker, # Añadir picker invisible al árbol visual
+                    ft.Icon("upload_file_rounded", size=48, color=COLORS.TEXT_MUTED),
+                    ft.Text("Arrastra archivos .txt o .docx aquí", color=COLORS.TEXT_SECONDARY),
+                    ft.Container(height=10),
+                    self.browse_btn,
+                    ft.Container(height=10),
+                    ft.Text("— o pega URLs directamente —", size=12, color=COLORS.TEXT_MUTED),
                     self.url_input,
                 ],
                 horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-                spacing=SPACING.XS,
+                spacing=5,
             ),
             bgcolor=COLORS.SURFACE,
-            border=ft.Border.all(2, COLORS.SURFACE_BORDER) if hasattr(ft, 'Border') else ft.border.all(2, COLORS.SURFACE_BORDER),
+            border=ft.border.all(2, COLORS.SURFACE_BORDER),
             border_radius=SPACING.RADIUS_LG,
             padding=SPACING.LG,
-            height=400,  # Fixed height for Flet 0.80+
+            height=400,
         )
-        # Set hover handler AFTER init to avoid version conflicts
-        self.on_hover = self._handle_hover
-    
-    def _handle_hover(self, e: ft.HoverEvent) -> None:
-        """Handle hover state for visual feedback."""
-        border_fn = ft.Border.all if hasattr(ft, 'Border') else ft.border.all
-        if e.data == "true":
-            self.border = border_fn(2, COLORS.PRIMARY)
-            self.bgcolor = COLORS.DRAG_ZONE_ACTIVE
-        else:
-            self.border = border_fn(2, COLORS.SURFACE_BORDER)
-            self.bgcolor = COLORS.SURFACE
-        self.update()
-    
-    def _handle_file_result(self, e: ft.ControlEvent) -> None:
-        """Handle file picker result."""
+
+    def _handle_file_result(self, e: ft.ControlEvent): # Usar ControlEvent genérico
         if e.files and self.on_file_drop:
-            file_paths = [f.path for f in e.files]
-            self.on_file_drop(file_paths)
-    
-    def _handle_url_change(self, e: ft.ControlEvent) -> None:
-        """Handle URL input changes."""
-        pass  # URL processing happens on execute
-    
+            self.on_file_drop([f.path for f in e.files])
+
     def get_urls(self) -> List[str]:
-        """Extract URLs from the input field."""
-        text = self.url_input.value or ""
-        lines = text.strip().split("\n")
-        urls = [line.strip() for line in lines if line.strip()]
-        return urls
-    
-    def clear(self) -> None:
-        """Clear the URL input."""
+        return [line.strip() for line in (self.url_input.value or "").split("\n") if line.strip()]
+
+    def clear(self):
         self.url_input.value = ""
         self.update()
 
-
 class ProgressIndicator(ft.Container):
-    """
-    Progress bar with label and percentage.
-    """
-    
     def __init__(self, label: str = "Progreso"):
-        self.label_text = ft.Text(
-            label,
-            color=COLORS.TEXT_SECONDARY,
-            size=TYPOGRAPHY.SIZE_SM,
-        )
-        
-        self.percentage_text = ft.Text(
-            "0%",
-            color=COLORS.TEXT_PRIMARY,
-            size=TYPOGRAPHY.SIZE_SM,
-            weight=ft.FontWeight.W_600,
-        )
-        
-        self.progress_bar = ft.ProgressBar(
-            value=0,
-            bgcolor=COLORS.SURFACE_BORDER,
-            color=COLORS.PRIMARY,
-            height=8,
-            border_radius=4,
-        )
-        
+        self.progress_bar = ft.ProgressBar(value=0, color=COLORS.PRIMARY, bgcolor=COLORS.SURFACE_BORDER)
+        self.label = ft.Text(label, size=12, color=COLORS.TEXT_SECONDARY)
         super().__init__(
-            content=ft.Column(
-                controls=[
-                    ft.Row(
-                        controls=[
-                            self.label_text,
-                            self.percentage_text,
-                        ],
-                        alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
-                    ),
-                    self.progress_bar,
-                ],
-                spacing=SPACING.XS,
-            ),
-            visible=False,
+            content=ft.Column([self.label, self.progress_bar]),
+            visible=False
         )
     
-    def set_progress(self, value: float, label: Optional[str] = None) -> None:
-        """
-        Update progress value (0.0 to 1.0).
-        """
-        self.progress_bar.value = max(0, min(1, value))
-        self.percentage_text.value = f"{int(value * 100)}%"
-        if label:
-            self.label_text.value = label
+    def set_progress(self, value: float, label: str = None):
+        self.progress_bar.value = value
+        if label: self.label.value = label
         self.update()
-    
-    def show(self) -> None:
-        """Show the progress indicator."""
-        self.visible = True
-        self.update()
-    
-    def hide(self) -> None:
-        """Hide the progress indicator."""
-        self.visible = False
-        self.progress_bar.value = 0
-        self.percentage_text.value = "0%"
-        self.update()
-
+        
+    def show(self): self.visible = True; self.update()
+    def hide(self): self.visible = False; self.update()
 
 class StatusBar(ft.Container):
-    """
-    Bottom status bar showing app state.
-    """
-    
     def __init__(self):
-        self.status_text = ft.Text(
-            "Esperando órdenes...",
-            color=COLORS.TEXT_MUTED,
-            size=TYPOGRAPHY.SIZE_SM,
-            font_family=TYPOGRAPHY.FONT_MONO,
-        )
-        
-        self.version_text = ft.Text(
-            "v1.0 Local Build",
-            color=COLORS.TEXT_MUTED,
-            size=TYPOGRAPHY.SIZE_XS,
-        )
-        
+        self.status = ft.Text("Listo", size=12, color=COLORS.TEXT_MUTED)
         super().__init__(
-            content=ft.Row(
-                controls=[
-                    ft.Row(
-                        controls=[
-                            ft.Icon(
-                                "circle",
-                                size=8,
-                                color=COLORS.SUCCESS,
-                            ),
-                            self.status_text,
-                        ],
-                        spacing=SPACING.SM,
-                    ),
-                    self.version_text,
-                ],
-                alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
-            ),
+            content=ft.Row([ft.Icon("circle", size=8, color=COLORS.SUCCESS), self.status]),
             bgcolor=COLORS.BACKGROUND,
-            border=ft.border.only(top=ft.BorderSide(1, COLORS.SURFACE_BORDER)),
-            padding=ft.padding.symmetric(horizontal=SPACING.MD, vertical=SPACING.SM),
+            padding=ft.padding.symmetric(horizontal=16, vertical=8),
+            border=ft.border.only(top=ft.BorderSide(1, COLORS.SURFACE_BORDER))
         )
-    
-    def set_status(self, message: str, status: str = "idle") -> None:
-        """
-        Update status message.
-        
-        Args:
-            message: Status message
-            status: 'idle' | 'working' | 'success' | 'error'
-        """
-        color_map = {
-            "idle": COLORS.TEXT_MUTED,
-            "working": COLORS.PRIMARY,
-            "success": COLORS.SUCCESS,
-            "error": COLORS.ERROR,
-        }
-        
-        icon_map = {
-            "idle": COLORS.SUCCESS,
-            "working": COLORS.PRIMARY,
-            "success": COLORS.SUCCESS,
-            "error": COLORS.ERROR,
-        }
-        
-        self.status_text.value = message
-        self.status_text.color = color_map.get(status, COLORS.TEXT_MUTED)
+    def set_status(self, msg, status="idle"):
+        self.status.value = msg
         self.update()

@@ -1,435 +1,166 @@
 """
-PRISMA - Main Layout
-====================
-Main window structure and layout composition.
-Implements the two-column layout with input zone, terminal, and controls.
+PRISMA - Main Layout (Safe Mode)
 """
-
 from typing import Callable, Optional, List
 import flet as ft
-
 from src.ui.theme import COLORS, TYPOGRAPHY, SPACING, CONFIG
-from src.ui.components import (
-    PrismaButton,
-    PrismaSwitch,
-    TerminalLog,
-    DragDropZone,
-    ProgressIndicator,
-    StatusBar,
-)
-
+from src.ui.components import PrismaButton, PrismaSwitch, TerminalLog, DragDropZone, ProgressIndicator, StatusBar
 
 class HeaderSection(ft.Container):
-    """
-    Top header with app branding and title.
-    """
-    
     def __init__(self):
-        # Logo/Icon
-        logo = ft.Container(
-            content=ft.Icon(
-                "auto_awesome",
-                size=32,
-                color=COLORS.PRIMARY,
-            ),
-            bgcolor=COLORS.SURFACE,
-            border_radius=SPACING.RADIUS_MD,
-            padding=SPACING.SM,
-        )
-        
-        # Title
-        title = ft.Column(
-            controls=[
-                ft.Text(
-                    CONFIG.APP_NAME,
-                    size=TYPOGRAPHY.SIZE_2XL,
-                    weight=ft.FontWeight.W_700,
-                    color=COLORS.TEXT_PRIMARY,
-                ),
-                ft.Text(
-                    CONFIG.APP_SUBTITLE,
-                    size=TYPOGRAPHY.SIZE_SM,
-                    color=COLORS.TEXT_SECONDARY,
-                ),
-            ],
-            spacing=0,
-        )
-        
         super().__init__(
             content=ft.Row(
-                controls=[logo, title],
+                controls=[
+                    ft.Container(
+                        content=ft.Icon("auto_awesome", size=32, color=COLORS.PRIMARY),
+                        bgcolor=COLORS.SURFACE, border_radius=SPACING.RADIUS_MD, padding=SPACING.SM
+                    ),
+                    ft.Column([
+                        ft.Text(CONFIG.APP_NAME, size=24, weight=ft.FontWeight.W_700, color=COLORS.TEXT_PRIMARY),
+                        ft.Text(CONFIG.APP_SUBTITLE, size=12, color=COLORS.TEXT_SECONDARY),
+                    ], spacing=0)
+                ],
                 spacing=SPACING.MD,
-                vertical_alignment=ft.CrossAxisAlignment.CENTER,
             ),
             bgcolor=COLORS.BACKGROUND,
-            padding=ft.Padding(left=SPACING.LG, right=SPACING.LG, top=SPACING.MD, bottom=SPACING.SM) if hasattr(ft, 'Padding') else ft.padding.only(left=SPACING.LG, right=SPACING.LG, top=SPACING.MD, bottom=SPACING.SM),
+            padding=ft.padding.only(left=24, right=24, top=16, bottom=8)
         )
-
 
 class InputSection(ft.Container):
-    """
-    Left panel containing the drag-drop zone and URL input.
-    """
-    
-    def __init__(
-        self,
-        on_file_drop: Optional[Callable] = None,
-    ):
+    def __init__(self, on_file_drop: Optional[Callable] = None):
         self.drag_drop_zone = DragDropZone(on_file_drop=on_file_drop)
-        
-        # Detected items counter
-        self.items_counter = ft.Container(
-            content=ft.Row(
-                controls=[
-                    ft.Icon(
-                        "link_rounded",
-                        size=16,
-                        color=COLORS.TEXT_SECONDARY,
-                    ),
-                    ft.Text(
-                        "0 enlaces detectados",
-                        size=TYPOGRAPHY.SIZE_SM,
-                        color=COLORS.TEXT_SECONDARY,
-                    ),
-                ],
-                spacing=SPACING.XS,
-            ),
-            padding=ft.padding.symmetric(vertical=SPACING.SM),
-        )
+        self.counter_text = ft.Text("0 enlaces detectados", size=12, color=COLORS.TEXT_SECONDARY)
         
         super().__init__(
             content=ft.Column(
                 controls=[
-                    ft.Text(
-                        "ENTRADA",
-                        size=TYPOGRAPHY.SIZE_XS,
-                        weight=ft.FontWeight.W_600,
-                        color=COLORS.TEXT_MUTED,
-                    ),
+                    ft.Text("ENTRADA", size=11, weight=ft.FontWeight.W_600, color=COLORS.TEXT_MUTED),
                     self.drag_drop_zone,
-                    self.items_counter,
+                    ft.Row([ft.Icon("link_rounded", size=16, color=COLORS.TEXT_SECONDARY), self.counter_text]),
                 ],
-                spacing=SPACING.SM,
+                spacing=10,
+                expand=True
             ),
             bgcolor=COLORS.BACKGROUND,
-            padding=SPACING.MD,
-            width=550,  # Fixed width for Flet 0.80+
-            height=500,  # Fixed height for Flet 0.80+
+            padding=16,
+            expand=True
         )
-    
-    def update_counter(self, count: int) -> None:
-        """Update the detected items counter."""
-        text = f"{count} enlace{'s' if count != 1 else ''} detectado{'s' if count != 1 else ''}"
-        self.items_counter.content.controls[1].value = text
-        self.items_counter.update()
-    
-    def get_urls(self) -> List[str]:
-        """Get URLs from the drag-drop zone."""
-        return self.drag_drop_zone.get_urls()
-    
-    def clear(self) -> None:
-        """Clear all inputs."""
-        self.drag_drop_zone.clear()
-        self.update_counter(0)
 
+    def update_counter(self, count):
+        self.counter_text.value = f"{count} enlaces detectados"
+        self.counter_text.update()
+    
+    def get_urls(self): return self.drag_drop_zone.get_urls()
 
 class TerminalSection(ft.Container):
-    """
-    Right panel containing the live log terminal.
-    """
-    
     def __init__(self):
-        self.terminal = TerminalLog(height=350)
-
-        # View report button (hidden initially)
-        self.view_report_btn = PrismaButton(
-            text="Ver Reporte Final",
-            icon="description_rounded",
-            variant="primary",
-            expand=True,
-        )
-        self.view_report_btn.visible = False
+        self.terminal = TerminalLog(height=None)
+        # Botón inicial sin evento
+        self.report_btn = PrismaButton("Ver Reporte", icon="description_rounded", expand=True)
+        self.report_btn.visible = False
         
         super().__init__(
             content=ft.Column(
                 controls=[
-                    ft.Text(
-                        "TERMINAL",
-                        size=TYPOGRAPHY.SIZE_XS,
-                        weight=ft.FontWeight.W_600,
-                        color=COLORS.TEXT_MUTED,
-                    ),
+                    ft.Text("TERMINAL", size=11, weight=ft.FontWeight.W_600, color=COLORS.TEXT_MUTED),
                     self.terminal,
-                    self.view_report_btn,
+                    self.report_btn
                 ],
-                spacing=SPACING.SM,
+                spacing=10,
+                expand=True
             ),
             bgcolor=COLORS.BACKGROUND,
-            padding=SPACING.MD,
-            width=550,  # Fixed width for Flet 0.80+
-            height=500,  # Fixed height for Flet 0.80+
+            padding=16,
+            expand=True
         )
-    
-    def log(self, message: str, status: str = "info") -> None:
-        """Add log entry to terminal."""
-        self.terminal.add_log(message, status)
-    
-    def clear(self) -> None:
-        """Clear terminal."""
-        self.terminal.clear()
-    
-    def show_report_button(self, on_click: Callable) -> None:
-        """Show the view report button."""
-        self.view_report_btn.on_click = on_click
-        self.view_report_btn.visible = True
-        self.view_report_btn.update()
-    
-    def hide_report_button(self) -> None:
-        """Hide the view report button."""
-        self.view_report_btn.visible = False
-        self.view_report_btn.update()
 
+    def log(self, msg, status="info"): self.terminal.add_log(msg, status)
+    def clear(self): self.terminal.clear()
+    def show_report_button(self, on_click): 
+        self.report_btn.on_click = on_click
+        self.report_btn.visible = True
+        self.report_btn.update()
 
 class ControlPanel(ft.Container):
-    """
-    Bottom control panel with mode selection and execute button.
-    """
-    
-    def __init__(
-        self,
-        on_execute: Optional[Callable] = None,
-        on_mode_change: Optional[Callable] = None,
-    ):
-        self.on_execute = on_execute
-        self.on_mode_change = on_mode_change
+    def __init__(self, on_execute=None, on_mode_change=None):
+        # Manejador seguro para switch
+        def handle_switch_change(e):
+            if on_mode_change:
+                val = "analyze" if e.control.value else "scrape"
+                on_mode_change(val)
 
-        # Mode switches - create without on_change
-        self.ai_switch = PrismaSwitch(
-            label="Análisis con IA",
-            value=False,
-        )
-        # Set handler after initialization
-        self.ai_switch.switch.on_change = self._handle_mode_change
+        self.ai_switch = PrismaSwitch("Análisis con IA", on_change=handle_switch_change)
+        self.progress = ProgressIndicator()
         
-        # AI status indicator
-        self.ai_status = ft.Row(
-            controls=[
-                ft.Icon(
-                    "memory_rounded",
-                    size=16,
-                    color=COLORS.TEXT_MUTED,
-                ),
-                ft.Text(
-                    "IA no descargada",
-                    size=TYPOGRAPHY.SIZE_XS,
-                    color=COLORS.TEXT_MUTED,
-                ),
-            ],
-            spacing=SPACING.XS,
-        )
-        
-        # Progress indicator for model download
-        self.progress = ProgressIndicator(label="Descargando modelo...")
+        # Manejador seguro para botón execute
+        def handle_execute_click(_):
+            if on_execute:
+                on_execute()
 
-        # Execute button - create without on_click
-        self.execute_btn = PrismaButton(
-            text="EJECUTAR INVESTIGACIÓN",
-            icon="rocket_launch_rounded",
-            variant="primary",
-            expand=True,
-        )
-        # Set handler after initialization
-        self.execute_btn.on_click = self._handle_execute
+        self.execute_btn = PrismaButton("EJECUTAR INVESTIGACIÓN", icon="rocket_launch_rounded", expand=True)
+        self.execute_btn.on_click = handle_execute_click # Asignación tardía
         
         super().__init__(
             content=ft.Column(
                 controls=[
+                    ft.Row([self.ai_switch], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
+                    self.progress,
+                    self.execute_btn
+                ],
+                spacing=16
+            ),
+            bgcolor=COLORS.SURFACE,
+            padding=24,
+            border=ft.border.only(top=ft.BorderSide(1, COLORS.SURFACE_BORDER))
+        )
+        
+    def get_mode(self): return "analyze" if self.ai_switch.value else "scrape"
+    def set_executing(self, active):
+        self.execute_btn.disabled = active
+        self.execute_btn.text = "PROCESANDO..." if active else "EJECUTAR INVESTIGACIÓN"
+        self.execute_btn.update()
+    def set_ai_status(self, msg, available): pass 
+    def show_progress(self, val, label): self.progress.set_progress(val, label); self.progress.show()
+    def hide_progress(self): self.progress.hide()
+
+class MainLayout(ft.Container):
+    def __init__(self, on_execute=None, on_mode_change=None, on_file_drop=None):
+        self.input_section = InputSection(on_file_drop)
+        self.terminal_section = TerminalSection()
+        self.control_panel = ControlPanel(on_execute, on_mode_change)
+        self.status_bar = StatusBar()
+        
+        super().__init__(
+            content=ft.Column(
+                controls=[
+                    HeaderSection(),
+                    ft.Divider(height=1, color=COLORS.SURFACE_BORDER),
                     ft.Container(
                         content=ft.Row(
                             controls=[
-                                ft.Column(
-                                    controls=[
-                                        ft.Text(
-                                            "MODO DE OPERACIÓN",
-                                            size=TYPOGRAPHY.SIZE_XS,
-                                            weight=ft.FontWeight.W_600,
-                                            color=COLORS.TEXT_MUTED,
-                                        ),
-                                        ft.Row(
-                                            controls=[
-                                                ft.Radio(
-                                                    value="scrape",
-                                                    label="Solo Scraping (.md)",
-                                                    fill_color={
-                                                        ft.ControlState.SELECTED: COLORS.PRIMARY,
-                                                    },
-                                                ),
-                                                ft.Radio(
-                                                    value="analyze",
-                                                    label="Scraping + Análisis IA",
-                                                    fill_color={
-                                                        ft.ControlState.SELECTED: COLORS.PRIMARY,
-                                                    },
-                                                ),
-                                            ],
-                                        ),
-                                    ],
-                                    spacing=SPACING.XS,
-                                ),
-                                ft.Container(expand=True),
-                                ft.Column(
-                                    controls=[
-                                        self.ai_status,
-                                    ],
-                                    horizontal_alignment=ft.CrossAxisAlignment.END,
-                                ),
+                                self.input_section,
+                                ft.VerticalDivider(width=1, color=COLORS.SURFACE_BORDER),
+                                self.terminal_section
                             ],
+                            spacing=0,
+                            expand=True
                         ),
-                        padding=ft.padding.only(bottom=SPACING.SM),
+                        expand=True 
                     ),
-                    self.progress,
-                    self.execute_btn,
-                ],
-                spacing=SPACING.MD,
-            ),
-            bgcolor=COLORS.SURFACE,
-            border_radius=SPACING.RADIUS_LG,
-            border=ft.Border.all(1, COLORS.SURFACE_BORDER) if hasattr(ft, 'Border') else ft.border.all(1, COLORS.SURFACE_BORDER),
-            padding=SPACING.LG,
-            margin=ft.Margin.symmetric(horizontal=SPACING.MD) if hasattr(ft, 'Margin') else ft.margin.symmetric(horizontal=SPACING.MD),
-        )
-        
-        # Radio group - create without on_change
-        self.mode_group = ft.RadioGroup(
-            value="scrape",
-            content=self.content.controls[0].content.controls[0].controls[1],
-        )
-        # Set handler after initialization
-        self.mode_group.on_change = self._handle_mode_change
-    
-    def _handle_mode_change(self, e: ft.ControlEvent) -> None:
-        """Handle mode selection change."""
-        if self.on_mode_change:
-            self.on_mode_change(e.control.value if hasattr(e.control, 'value') else "scrape")
-    
-    def _handle_execute(self, _e: ft.ControlEvent) -> None:
-        """Handle execute button click."""
-        if self.on_execute:
-            self.on_execute()
-    
-    def get_mode(self) -> str:
-        """Get current operation mode."""
-        return self.mode_group.value or "scrape"
-    
-    def set_ai_status(self, status: str, available: bool = False) -> None:
-        """
-        Update AI status display.
-        
-        Args:
-            status: Status message
-            available: Whether AI is ready to use
-        """
-        color = COLORS.SUCCESS if available else COLORS.TEXT_MUTED
-        icon = "check_circle_rounded" if available else "memory_rounded"
-
-        self.ai_status.controls[0].name = icon
-        self.ai_status.controls[0].color = color
-        self.ai_status.controls[1].value = status
-        self.ai_status.controls[1].color = color
-        self.ai_status.update()
-    
-    def set_executing(self, executing: bool) -> None:
-        """Toggle button state during execution."""
-        self.execute_btn.disabled = executing
-        self.execute_btn.text = "PROCESANDO..." if executing else "EJECUTAR INVESTIGACIÓN"
-        self.execute_btn.icon = "hourglass_top_rounded" if executing else "rocket_launch_rounded"
-        self.execute_btn.update()
-    
-    def show_progress(self, value: float, label: str = "Descargando modelo...") -> None:
-        """Show and update progress bar."""
-        self.progress.set_progress(value, label)
-        self.progress.show()
-    
-    def hide_progress(self) -> None:
-        """Hide progress bar."""
-        self.progress.hide()
-
-
-class MainLayout(ft.Container):
-    """
-    Main application layout composing all sections.
-    """
-    
-    def __init__(
-        self,
-        on_execute: Optional[Callable] = None,
-        on_mode_change: Optional[Callable] = None,
-        on_file_drop: Optional[Callable] = None,
-    ):
-        # Create sections
-        self.header = HeaderSection()
-        self.input_section = InputSection(on_file_drop=on_file_drop)
-        self.terminal_section = TerminalSection()
-        self.control_panel = ControlPanel(
-            on_execute=on_execute,
-            on_mode_change=on_mode_change,
-        )
-        self.status_bar = StatusBar()
-        
-        # Main content area (two columns)
-        main_content = ft.Row(
-            controls=[
-                self.input_section,
-                ft.VerticalDivider(width=1, color=COLORS.SURFACE_BORDER),
-                self.terminal_section,
-            ],
-            spacing=0,
-            height=500,  # CRITICAL: Fixed height for Flet 0.80+
-        )
-        
-        super().__init__(
-            content=ft.Column(
-                controls=[
-                    self.header,
-                    ft.Divider(height=1, color=COLORS.SURFACE_BORDER),
-                    main_content,  # No wrapper needed with fixed dimensions
                     self.control_panel,
-                    self.status_bar,
+                    self.status_bar
                 ],
                 spacing=0,
+                expand=True
             ),
             bgcolor=COLORS.BACKGROUND,
-            width=1200,  # Fixed width matching window
-            height=800,  # Fixed height matching window
+            expand=True
         )
-    
-    # Convenience methods to access child components
-    def log(self, message: str, status: str = "info") -> None:
-        """Add log to terminal."""
-        self.terminal_section.log(message, status)
-    
-    def clear_terminal(self) -> None:
-        """Clear terminal logs."""
-        self.terminal_section.clear()
-    
-    def set_status(self, message: str, status: str = "idle") -> None:
-        """Update status bar."""
-        self.status_bar.set_status(message, status)
-    
-    def get_urls(self) -> List[str]:
-        """Get URLs from input section."""
-        return self.input_section.get_urls()
-    
-    def update_url_counter(self, count: int) -> None:
-        """Update URL counter."""
-        self.input_section.update_counter(count)
-    
-    def get_mode(self) -> str:
-        """Get operation mode."""
-        return self.control_panel.get_mode()
-    
-    def set_executing(self, executing: bool) -> None:
-        """Set execution state."""
-        self.control_panel.set_executing(executing)
-        status = "Procesando..." if executing else "Esperando órdenes..."
-        self.set_status(status, "working" if executing else "idle")
+
+    # Proxy methods
+    def log(self, *args): self.terminal_section.log(*args)
+    def get_urls(self): return self.input_section.get_urls()
+    def update_url_counter(self, c): self.input_section.update_counter(c)
+    def get_mode(self): return self.control_panel.get_mode()
+    def set_executing(self, e): self.control_panel.set_executing(e); self.status_bar.set_status("Procesando..." if e else "Listo")
+    def set_status(self, m, s): self.status_bar.set_status(m, s)
