@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(taskkill:*)",
+      "Bash(pkill:*)",
+      "Bash(timeout 8 ./venv/Scripts/python.exe:*)"
+    ]
+  }
+}

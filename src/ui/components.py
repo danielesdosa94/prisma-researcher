@@ -12,9 +12,10 @@ import flet as ft
 from src.ui.theme import COLORS, TYPOGRAPHY, SPACING
 
 
-class PrismaButton(ft.ElevatedButton):
+class PrismaButton(ft.Container):
     """
     Primary action button with PRISMA styling.
+    Uses Container for maximum compatibility across Flet versions.
 
     Args:
         text: Button label
@@ -37,39 +38,102 @@ class PrismaButton(ft.ElevatedButton):
         # Determine colors based on variant
         if variant == "primary":
             bg_color = COLORS.PRIMARY
+            hover_color = COLORS.PRIMARY_HOVER
             text_color = COLORS.TEXT_ON_PRIMARY
         elif variant == "secondary":
             bg_color = COLORS.SURFACE
+            hover_color = COLORS.SURFACE_HOVER
             text_color = COLORS.TEXT_PRIMARY
         else:  # ghost
             bg_color = "transparent"
+            hover_color = COLORS.SURFACE_HOVER
             text_color = COLORS.TEXT_SECONDARY
 
-        # Call parent constructor with minimal args
-        super().__init__(
-            disabled=disabled,
-            expand=expand,
-            height=SPACING.BUTTON_HEIGHT,
-            style=ft.ButtonStyle(
-                bgcolor={
-                    ft.ControlState.DEFAULT: bg_color,
-                    ft.ControlState.HOVERED: COLORS.PRIMARY_HOVER if variant == "primary" else COLORS.SURFACE_HOVER,
-                    ft.ControlState.DISABLED: COLORS.SURFACE,
-                },
-                color={
-                    ft.ControlState.DEFAULT: text_color,
-                    ft.ControlState.DISABLED: COLORS.TEXT_MUTED,
-                },
-                shape=ft.RoundedRectangleBorder(radius=SPACING.RADIUS_MD),
-                padding=ft.padding.symmetric(horizontal=SPACING.LG),
-            ),
+        # Store properties
+        self._text = text
+        self._icon = icon
+        self._text_color = text_color
+        self._bg_color = bg_color
+        self._hover_color = hover_color
+        self._disabled = disabled
+        self._on_click = on_click
+
+        # Build content with icon and text
+        content_controls = []
+        if icon:
+            content_controls.append(ft.Icon(icon, size=18, color=text_color))
+        content_controls.append(
+            ft.Text(text, size=14, weight=ft.FontWeight.W_500, color=text_color)
         )
 
-        # Set properties after initialization to avoid version conflicts
-        self.text = text
-        self.icon = icon
-        if on_click:
+        button_content = ft.Row(
+            controls=content_controls,
+            spacing=8,
+            alignment=ft.MainAxisAlignment.CENTER,
+            tight=True,
+        )
+
+        # Create container with button styling
+        super().__init__(
+            content=button_content,
+            bgcolor=COLORS.SURFACE if disabled else bg_color,
+            border_radius=SPACING.RADIUS_MD,
+            padding=ft.padding.symmetric(horizontal=SPACING.LG, vertical=12),
+            height=SPACING.BUTTON_HEIGHT,
+            expand=expand,
+            ink=not disabled,  # Ripple effect
+            on_hover=self._handle_hover if not disabled else None,
+        )
+
+        # Set click handler
+        if on_click and not disabled:
             self.on_click = on_click
+
+    def _handle_hover(self, e: ft.HoverEvent) -> None:
+        """Handle hover state for visual feedback."""
+        if e.data == "true":
+            self.bgcolor = self._hover_color
+        else:
+            self.bgcolor = self._bg_color
+        self.update()
+
+    @property
+    def text(self) -> str:
+        """Get button text."""
+        return self._text
+
+    @text.setter
+    def text(self, value: str) -> None:
+        """Set button text and update content."""
+        self._text = value
+        self._update_content()
+
+    @property
+    def icon(self) -> Optional[str]:
+        """Get button icon."""
+        return self._icon
+
+    @icon.setter
+    def icon(self, value: Optional[str]) -> None:
+        """Set button icon and update content."""
+        self._icon = value
+        self._update_content()
+
+    def _update_content(self) -> None:
+        """Update button content with current text and icon."""
+        content_controls = []
+        if self._icon:
+            content_controls.append(ft.Icon(self._icon, size=18, color=self._text_color))
+        content_controls.append(
+            ft.Text(self._text, size=14, weight=ft.FontWeight.W_500, color=self._text_color)
+        )
+
+        self.content = ft.Row(
+            controls=content_controls,
+            spacing=8,
+            alignment=ft.MainAxisAlignment.CENTER,
+            tight=True,
+        )
 
 
 class PrismaTextField(ft.TextField):
@@ -94,6 +158,8 @@ class PrismaTextField(ft.TextField):
         expand: bool = False,
     ):
         super().__init__(
+            label=label,
+            hint_text=hint_text,
             multiline=multiline,
             password=password,
             expand=expand,
@@ -110,11 +176,7 @@ class PrismaTextField(ft.TextField):
             border_radius=SPACING.RADIUS_MD,
         )
 
-        # Set properties after initialization
-        if label:
-            self.label = label
-        if hint_text:
-            self.hint_text = hint_text
+        # Set event handlers AFTER initialization to avoid version conflicts
         if on_change:
             self.on_change = on_change
 
@@ -187,7 +249,7 @@ class TerminalLog(ft.Container):
             content=self.log_column,
             bgcolor=COLORS.TERMINAL_BG,
             border_radius=SPACING.RADIUS_MD,
-            border=ft.border.all(1, COLORS.SURFACE_BORDER),
+            border=ft.Border.all(1, COLORS.SURFACE_BORDER) if hasattr(ft, 'Border') else ft.border.all(1, COLORS.SURFACE_BORDER),
             padding=SPACING.MD,
             height=height,
             expand=True,
@@ -242,19 +304,23 @@ class TerminalLog(ft.Container):
         
         self.log_entries.append(entry)
         self.log_column.controls.append(entry)
-        
+
         # Keep only last 500 entries to prevent memory issues
         if len(self.log_entries) > 500:
             removed = self.log_entries.pop(0)
             self.log_column.controls.remove(removed)
-        
-        self.update()
-    
+
+        # Safe update - only if added to page
+        if self.page:
+            self.update()
+
     def clear(self) -> None:
         """Clear all log entries."""
         self.log_entries.clear()
         self.log_column.controls.clear()
-        self.update()
+        # Safe update - only if added to page
+        if self.page:
+            self.update()
 
 
 class DragDropZone(ft.Container):
@@ -272,8 +338,9 @@ class DragDropZone(ft.Container):
         self.on_url_paste = on_url_paste
         self.is_dragging = False
         
-        # URL input field
+        # URL input field - include hint_text in constructor for visibility
         self.url_input = ft.TextField(
+            hint_text="Pega URLs aquí (una por línea)...",
             multiline=True,
             min_lines=3,
             max_lines=5,
@@ -285,8 +352,7 @@ class DragDropZone(ft.Container):
             hint_style=ft.TextStyle(color=COLORS.TEXT_MUTED),
             border_radius=SPACING.RADIUS_SM,
         )
-        # Set properties after initialization
-        self.url_input.hint_text = "Pega URLs aquí (una por línea)..."
+        # Set event handler AFTER initialization to avoid version conflicts
         self.url_input.on_change = self._handle_url_change
 
         # File picker - create without on_result argument
@@ -341,20 +407,22 @@ class DragDropZone(ft.Container):
                 spacing=SPACING.XS,
             ),
             bgcolor=COLORS.SURFACE,
-            border=ft.border.all(2, COLORS.SURFACE_BORDER),
+            border=ft.Border.all(2, COLORS.SURFACE_BORDER) if hasattr(ft, 'Border') else ft.border.all(2, COLORS.SURFACE_BORDER),
             border_radius=SPACING.RADIUS_LG,
             padding=SPACING.LG,
-            expand=True,
-            on_hover=self._handle_hover,
+            height=400,  # Fixed height for Flet 0.80+
         )
+        # Set hover handler AFTER init to avoid version conflicts
+        self.on_hover = self._handle_hover
     
     def _handle_hover(self, e: ft.HoverEvent) -> None:
         """Handle hover state for visual feedback."""
+        border_fn = ft.Border.all if hasattr(ft, 'Border') else ft.border.all
         if e.data == "true":
-            self.border = ft.border.all(2, COLORS.PRIMARY)
+            self.border = border_fn(2, COLORS.PRIMARY)
             self.bgcolor = COLORS.DRAG_ZONE_ACTIVE
         else:
-            self.border = ft.border.all(2, COLORS.SURFACE_BORDER)
+            self.border = border_fn(2, COLORS.SURFACE_BORDER)
             self.bgcolor = COLORS.SURFACE
         self.update()
     

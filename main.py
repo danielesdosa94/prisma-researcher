@@ -21,7 +21,7 @@ import flet as ft
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent))
 
-from src.ui.theme import COLORS, TYPOGRAPHY, SPACING, CONFIG
+from src.ui.theme import COLORS, CONFIG
 from src.ui.layout import MainLayout
 from src.utils.logger import PrismaLogger, logger
 from src.utils.file_manager import FileManager
@@ -67,31 +67,43 @@ class PrismaApp:
         
         # Set up logger callback
         PrismaLogger.set_ui_callback(self.log_to_terminal)
-        
+
         # Add layout to page
         self.page.add(self.layout)
-        
+
+        # CRITICAL: Force page update to render all controls
+        self.page.update()
+
         # Initial status
         self.check_ai_status()
         self.log_to_terminal("PRISMA iniciado. Esperando input...", "info")
+
+        # Final update to ensure everything is visible
+        self.page.update()
     
     def setup_page(self) -> None:
         """Configure the Flet page settings."""
         self.page.title = f"{CONFIG.APP_NAME} - {CONFIG.APP_SUBTITLE}"
-        self.page.window.width = CONFIG.WINDOW_WIDTH
-        self.page.window.height = CONFIG.WINDOW_HEIGHT
-        self.page.window.min_width = CONFIG.WINDOW_MIN_WIDTH
-        self.page.window.min_height = CONFIG.WINDOW_MIN_HEIGHT
+
+        # Set window properties for Flet 0.70+ (direct properties)
+        try:
+            self.page.window_width = CONFIG.WINDOW_WIDTH
+            self.page.window_height = CONFIG.WINDOW_HEIGHT
+            self.page.window_min_width = CONFIG.WINDOW_MIN_WIDTH
+            self.page.window_min_height = CONFIG.WINDOW_MIN_HEIGHT
+        except Exception as e:
+            print(f"Warning: Could not set window size: {e}")
+
+        # CRITICAL: Set background and layout BEFORE theme
         self.page.bgcolor = COLORS.BACKGROUND
         self.page.padding = 0
         self.page.spacing = 0
-        
-        # Theme
+
+        # Theme mode (but DON'T override colors with theme)
         self.page.theme_mode = ft.ThemeMode.DARK
-        self.page.theme = ft.Theme(
-            color_scheme_seed=COLORS.PRIMARY,
-            font_family=TYPOGRAPHY.FONT_UI,
-        )
+
+        # Update page to apply settings
+        self.page.update()
     
     def log_to_terminal(self, message: str, status: str = "info") -> None:
         """Send log message to UI terminal."""

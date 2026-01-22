@@ -61,12 +61,8 @@ class HeaderSection(ft.Container):
                 spacing=SPACING.MD,
                 vertical_alignment=ft.CrossAxisAlignment.CENTER,
             ),
-            padding=ft.padding.only(
-                left=SPACING.LG,
-                right=SPACING.LG,
-                top=SPACING.MD,
-                bottom=SPACING.SM,
-            ),
+            bgcolor=COLORS.BACKGROUND,
+            padding=ft.Padding(left=SPACING.LG, right=SPACING.LG, top=SPACING.MD, bottom=SPACING.SM) if hasattr(ft, 'Padding') else ft.padding.only(left=SPACING.LG, right=SPACING.LG, top=SPACING.MD, bottom=SPACING.SM),
         )
 
 
@@ -114,11 +110,11 @@ class InputSection(ft.Container):
                     self.items_counter,
                 ],
                 spacing=SPACING.SM,
-                expand=True,
             ),
             bgcolor=COLORS.BACKGROUND,
             padding=SPACING.MD,
-            expand=True,
+            width=550,  # Fixed width for Flet 0.80+
+            height=500,  # Fixed height for Flet 0.80+
         )
     
     def update_counter(self, count: int) -> None:
@@ -167,11 +163,11 @@ class TerminalSection(ft.Container):
                     self.view_report_btn,
                 ],
                 spacing=SPACING.SM,
-                expand=True,
             ),
             bgcolor=COLORS.BACKGROUND,
             padding=SPACING.MD,
-            expand=True,
+            width=550,  # Fixed width for Flet 0.80+
+            height=500,  # Fixed height for Flet 0.80+
         )
     
     def log(self, message: str, status: str = "info") -> None:
@@ -298,9 +294,9 @@ class ControlPanel(ft.Container):
             ),
             bgcolor=COLORS.SURFACE,
             border_radius=SPACING.RADIUS_LG,
-            border=ft.border.all(1, COLORS.SURFACE_BORDER),
+            border=ft.Border.all(1, COLORS.SURFACE_BORDER) if hasattr(ft, 'Border') else ft.border.all(1, COLORS.SURFACE_BORDER),
             padding=SPACING.LG,
-            margin=ft.margin.symmetric(horizontal=SPACING.MD),
+            margin=ft.Margin.symmetric(horizontal=SPACING.MD) if hasattr(ft, 'Margin') else ft.margin.symmetric(horizontal=SPACING.MD),
         )
         
         # Radio group - create without on_change
@@ -387,8 +383,8 @@ class MainLayout(ft.Container):
                 ft.VerticalDivider(width=1, color=COLORS.SURFACE_BORDER),
                 self.terminal_section,
             ],
-            expand=True,
             spacing=0,
+            height=500,  # CRITICAL: Fixed height for Flet 0.80+
         )
         
         super().__init__(
@@ -396,16 +392,15 @@ class MainLayout(ft.Container):
                 controls=[
                     self.header,
                     ft.Divider(height=1, color=COLORS.SURFACE_BORDER),
-                    main_content,
+                    main_content,  # No wrapper needed with fixed dimensions
                     self.control_panel,
-                    ft.Container(height=SPACING.SM),
                     self.status_bar,
                 ],
                 spacing=0,
-                expand=True,
             ),
             bgcolor=COLORS.BACKGROUND,
-            expand=True,
+            width=1200,  # Fixed width matching window
+            height=800,  # Fixed height matching window
         )
     
     # Convenience methods to access child components
