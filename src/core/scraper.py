@@ -21,8 +21,16 @@ from pathlib import Path
 import html2text
 from playwright.async_api import async_playwright, Browser, Page, Error as PlaywrightError
 
-from src.utils.logger import PrismaLogger
-from src.utils.url_parser import sanitize_filename, get_domain
+try:
+    from src.utils.logger import PrismaLogger
+    from src.utils.url_parser import sanitize_filename, get_domain
+except ImportError:
+    # Fallback for direct module testing
+    import sys
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+    from src.utils.logger import PrismaLogger
+    from src.utils.url_parser import sanitize_filename, get_domain
 
 logger = PrismaLogger("Scraper")
 

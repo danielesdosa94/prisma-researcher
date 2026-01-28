@@ -1,201 +1,125 @@
-# 🔮 PRISMA - Automated Research Desktop App
+# PRISMA - Investigación Automatizada
 
-> **Desktop First, Privacy First** - Una herramienta de investigación automatizada que funciona completamente offline.
-
-![Version](https://img.shields.io/badge/version-1.0.0-violet)
+![Version](https://img.shields.io/badge/version-2.0.0-violet)
 ![Python](https://img.shields.io/badge/python-3.12+-blue)
-![License](https://img.shields.io/badge/license-MIT-green)
+![Flet](https://img.shields.io/badge/flet-0.21+-green)
 
-## 📋 Descripción
+**PRISMA** es una herramienta de escritorio para investigadores y creadores de contenido que necesitan procesar grandes cantidades de información web rápidamente.
 
-PRISMA es una aplicación de escritorio diseñada para investigadores y creadores de contenido que necesitan procesar grandes cantidades de información web rápidamente.
+## 🚀 Características
 
-### Core Loop
-1. **Input**: Arrastra URLs o archivos `.txt`/`.docx`
-2. **Scraping**: Extrae contenido limpio en formato Markdown
-3. **Análisis IA**: Una IA local analiza y sintetiza la información
-4. **Output**: Genera un informe profesional
+- **Scraping Web Inteligente**: Extrae contenido de múltiples URLs y lo convierte a Markdown limpio
+- **Análisis con IA Local**: Procesa y sintetiza información usando un modelo de lenguaje local (Qwen 2.5 3B)
+- **Privacy First**: Todo se ejecuta localmente, sin envío de datos a la nube
+- **Interfaz Moderna**: Dark mode con estética "hacker-chic"
 
-### Características
-- ✅ 100% Offline después de la configuración inicial
-- ✅ Sin suscripciones ni envío de datos a la nube
-- ✅ IA local con modelo Qwen 2.5 3B
-- ✅ Interfaz moderna Dark/Violet
-- ✅ Descarga de IA bajo demanda (Lazy Loading)
-
-## 🚀 Instalación
-
-### Requisitos
-- Python 3.12+
-- Windows 10/11 (probado), Linux, macOS
-- ~4GB RAM mínimo (~8GB recomendado para IA)
-- ~2GB espacio en disco (con modelo IA)
-
-### Pasos de Instalación
+## 📦 Instalación
 
 ```bash
-# 1. Clonar o descargar el proyecto
-git clone <repo-url>
-cd researcher_app
+# Clonar repositorio
+git clone https://github.com/your-repo/prisma.git
+cd prisma
 
-# 2. Crear entorno virtual
+# Crear entorno virtual
 python -m venv venv
+source venv/bin/activate  # Linux/Mac
+# o: venv\Scripts\activate  # Windows
 
-# 3. Activar entorno virtual
-# Windows (Git Bash):
-source venv/Scripts/activate
-# Windows (CMD):
-venv\Scripts\activate
-# Linux/macOS:
-source venv/bin/activate
-
-# 4. Instalar dependencias
+# Instalar dependencias
 pip install -r requirements.txt
 
-# 5. Instalar Playwright browsers
+# Instalar Playwright browsers
 playwright install chromium
+```
 
-# 6. Ejecutar la aplicación
+## 🎮 Uso
+
+```bash
+# Ejecutar aplicación
 python main.py
 ```
 
-## 🎨 Uso
+### Flujo de Trabajo
 
-### Modo Básico (Solo Scraping)
-1. Abre PRISMA
-2. Arrastra un archivo `.txt` con URLs o pégalas directamente
-3. Selecciona "Solo Scraping (.md)"
-4. Clic en **EJECUTAR INVESTIGACIÓN**
-5. Los archivos `.md` se guardan en `/output`
+1. **Arrastra archivos** `.txt` o `.docx` con URLs, o pega URLs directamente
+2. **Activa el switch** "Análisis con IA" si deseas generar un informe inteligente
+3. **Presiona** "EJECUTAR INVESTIGACIÓN"
+4. **Revisa** los resultados en la carpeta `output/`
 
-### Modo Avanzado (Scraping + IA)
-1. Selecciona "Scraping + Análisis IA"
-2. Si es la primera vez, se descargará el modelo (~1.8 GB)
-3. La IA analizará el contenido y generará un informe completo
-
-## 📁 Estructura del Proyecto
+## 🏗️ Estructura del Proyecto
 
 ```
-researcher_app/
+prisma/
 ├── main.py                 # Punto de entrada
 ├── requirements.txt        # Dependencias
-├── README.md              # Esta documentación
-│
-├── assets/
-│   └── models/            # Modelo IA (se descarga bajo demanda)
-│
 ├── src/
-│   ├── ui/                # Interfaz de usuario (Flet)
-│   │   ├── theme.py       # Colores, tipografía, espaciado
-│   │   ├── components.py  # Componentes reutilizables
-│   │   └── layout.py      # Layout principal
-│   │
-│   ├── core/              # Lógica de negocio
-│   │   ├── scraper.py     # Motor de scraping (Playwright)
-│   │   ├── analyzer.py    # Análisis IA (llama.cpp)
-│   │   └── downloader.py  # Descarga del modelo
-│   │
-│   └── utils/             # Utilidades
-│       ├── logger.py      # Sistema de logs
-│       ├── file_manager.py # Gestión de archivos
-│       └── url_parser.py  # Parsing de URLs
-│
-└── output/                # Resultados generados
+│   ├── ui/
+│   │   ├── theme.py       # Sistema de diseño (colores, tipografía)
+│   │   └── app_layout.py  # Componentes de interfaz
+│   ├── core/
+│   │   ├── scraper.py     # Motor de web scraping
+│   │   ├── analyzer.py    # Motor de análisis IA
+│   │   └── downloader.py  # Descargador de modelo
+│   └── utils/
+│       ├── logger.py      # Sistema de logging
+│       └── url_parser.py  # Utilidades de URLs
+├── assets/
+│   └── models/            # Modelos de IA (descargados bajo demanda)
+└── output/                # Archivos generados
 ```
 
-## 🛠️ Stack Tecnológico
+## 🎨 Tema Visual
 
-| Componente | Tecnología | Propósito |
-|------------|------------|-----------|
-| GUI | **Flet** | UI reactiva basada en Flutter |
-| Scraping | **Playwright** | Renderizado JS, automatización browser |
-| Conversión | **html2text** | HTML → Markdown |
-| IA | **llama-cpp-python** | Inferencia LLM local |
-| Modelo | **Qwen 2.5 3B** | LLM compacto y potente |
+| Elemento | Color |
+|----------|-------|
+| Background | `#0F1115` |
+| Surface | `#1E2129` |
+| Primary (Violeta) | `#8B5CF6` |
+| Success | `#10B981` |
+| Text | `#F1F5F9` |
 
-## 🎨 Sistema de Diseño
+## 📝 Notas Técnicas
 
-### Paleta de Colores
+### Arquitectura UI (Flet)
 
-| Color | Hex | Uso |
-|-------|-----|-----|
-| Background | `#0F1115` | Fondo principal |
-| Surface | `#1E2129` | Tarjetas, inputs |
-| Primary | `#8B5CF6` | Acento (Electric Violet) |
-| Success | `#10B981` | Estados exitosos |
-| Text | `#F1F5F9` | Texto principal |
-
-### Tipografía
-- **UI**: Inter / Roboto
-- **Código/Logs**: JetBrains Mono
-
-## 📦 Empaquetado (Distribución)
-
-Para crear un ejecutable standalone:
-
-```bash
-# Instalar PyInstaller
-pip install pyinstaller
-
-# Crear ejecutable
-pyinstaller --onefile --windowed --icon=assets/icon.ico --name=PRISMA main.py
-```
-
-El ejecutable estará en `dist/PRISMA.exe`
-
-## 🔧 Configuración Avanzada
-
-### Cambiar modelo de IA
-
-Edita `src/core/downloader.py`:
+El proyecto sigue un patrón de **inyección de dependencias** para el `FilePicker`:
 
 ```python
-@dataclass
-class ModelInfo:
-    repo_id: str = "TuRepo/TuModelo"
-    filename: str = "modelo.gguf"
-    size_gb: float = X.X
+# ❌ INCORRECTO - Causa "Red Box Error"
+page.add(Column([
+    FilePicker(),  # NO incluir en el árbol visual
+    OtherContent(),
+]))
+
+# ✅ CORRECTO - FilePicker en overlay
+file_picker = FilePicker()
+page.overlay.append(file_picker)  # Agregar a overlay PRIMERO
+layout = build_ui(file_picker)     # Pasar referencia
+page.add(layout)
 ```
 
-### Ajustar parámetros de scraping
+### Dimensiones Seguras
 
-Edita `src/core/scraper.py`:
+Para evitar "Gray Box" por colapso de layout:
 
-```python
-@dataclass
-class ScraperConfig:
-    timeout: int = 30000        # Timeout en ms
-    delay_between_requests: float = 1.0  # Delay entre requests
-    max_concurrent: int = 3     # Requests simultáneos
-```
+- Usar `width=X` fijo en secciones laterales
+- Solo usar `expand=True` en el contenedor que debe crecer
+- Los componentes fijos (header, footer) tienen `height=X` explícito
 
-## 🐛 Solución de Problemas
+## 🔧 Desarrollo
 
-### "Playwright no encuentra el browser"
 ```bash
-playwright install chromium
+# Ejecutar en modo desarrollo con hot reload
+flet run main.py -d
+
+# Empaquetar como ejecutable
+pyinstaller --onefile --windowed main.py
 ```
-
-### "Error de memoria al cargar modelo"
-- Asegúrate de tener al menos 4GB de RAM disponibles
-- Cierra otras aplicaciones pesadas
-
-### "El scraping falla en ciertas páginas"
-- Algunas páginas bloquean scrapers
-- Incrementa el `timeout` en la configuración
-- Verifica que la URL sea accesible manualmente
 
 ## 📄 Licencia
 
-MIT License - Libre para uso personal y comercial.
-
-## 🤝 Contribuciones
-
-Las contribuciones son bienvenidas. Por favor:
-1. Fork el repositorio
-2. Crea una rama para tu feature
-3. Envía un Pull Request
+MIT License - Ver archivo `LICENSE` para más detalles.
 
 ---
 
-**PRISMA** - Investigación inteligente, privacidad garantizada. 🔮
+Hecho con 💜 por el equipo Polígono Studio (Daniel Domínguez)

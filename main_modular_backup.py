@@ -22,7 +22,7 @@ import flet as ft
 sys.path.insert(0, str(Path(__file__).parent))
 
 from src.ui.theme import COLORS, CONFIG
-from src.ui.layout import MainLayout
+from src.ui.app_layout import MainLayout
 from src.utils.logger import PrismaLogger, logger
 from src.utils.file_manager import FileManager
 from src.utils.url_parser import extract_urls_from_text, parse_url_file

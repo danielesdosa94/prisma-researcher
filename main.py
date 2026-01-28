@@ -1,99 +1,142 @@
 """
-PRISMA - Automated Research Desktop App (MONOLITHIC VERSION)
-=============================================================
-Single-file implementation to debug UI rendering issues in Flet 0.80.2
+PRISMA - Automated Research Desktop App
+========================================
+Entry point for the application.
 
-PROBLEM SOLVED: expand=True in nested custom classes causes height collapse.
-SOLUTION: Use functions instead of class inheritance, explicit dimensions.
+ARCHITECTURE FIX:
+- FilePicker is created and added to page.overlay FIRST
+- FilePicker is then passed to UI builder via dependency injection
+- FilePicker is NEVER part of the visual tree
 
 Author: PRISMA Team
-Version: 1.0.0-monolith
+Version: 2.0.0
 """
 
 import asyncio
+import re
 from datetime import datetime
 from pathlib import Path
-from typing import List, Optional, Callable
+from typing import List, Optional
+
 import flet as ft
 
-# =============================================================================
-# THEME CONSTANTS (Inline - No imports)
-# =============================================================================
+# UI imports
+from src.ui.theme import COLORS, CONFIG
+from src.ui.app_layout import (
+    build_app_ui,
+    UIState,
+    update_url_counter,
+    set_button_state,
+    set_status,
+    show_progress,
+)
 
-class Colors:
-    """PRISMA color palette - Dark/Violet aesthetic."""
-    BACKGROUND = "#0F1115"
-    SURFACE = "#1E2129"
-    SURFACE_HOVER = "#282D38"
-    SURFACE_BORDER = "#2D333D"
-    PRIMARY = "#8B5CF6"
-    PRIMARY_HOVER = "#A78BFA"
-    PRIMARY_DIM = "#6D28D9"
-    SUCCESS = "#10B981"
-    ERROR = "#EF4444"
-    WARNING = "#F59E0B"
-    TEXT_PRIMARY = "#F1F5F9"
-    TEXT_SECONDARY = "#94A3B8"
-    TEXT_MUTED = "#64748B"
-    TEXT_ON_PRIMARY = "#FFFFFF"
-    TERMINAL_BG = "#0A0C0F"
+# Core imports (with graceful fallback if not available)
+try:
+    from src.core.scraper import WebScraper, create_scraper, ScrapeResult
+    SCRAPER_AVAILABLE = True
+except ImportError:
+    SCRAPER_AVAILABLE = False
+    print("[WARNING] Scraper module not available")
 
+try:
+    from src.core.analyzer import AIAnalyzer, create_analyzer
+    ANALYZER_AVAILABLE = True
+except ImportError:
+    ANALYZER_AVAILABLE = False
+    print("[WARNING] Analyzer module not available")
 
-class Config:
-    """Application configuration."""
-    APP_NAME = "PRISMA"
-    APP_SUBTITLE = "Investigación Automatizada"
-    WINDOW_WIDTH = 1200
-    WINDOW_HEIGHT = 800
-    WINDOW_MIN_WIDTH = 900
-    WINDOW_MIN_HEIGHT = 600
-
-
-# =============================================================================
-# GLOBAL STATE (Simple approach for monolith)
-# =============================================================================
-
-class AppState:
-    """Global application state."""
-    current_urls: List[str] = []
-    is_processing: bool = False
-    log_column: Optional[ft.Column] = None
-    url_counter: Optional[ft.Text] = None
-    execute_btn: Optional[ft.Container] = None
-    ai_switch: Optional[ft.Switch] = None
-    url_input: Optional[ft.TextField] = None
-    report_btn: Optional[ft.Container] = None
-    file_picker: Optional[ft.FilePicker] = None
-
-
-STATE = AppState()
+try:
+    from src.core.downloader import ModelDownloader, ensure_model_available
+    DOWNLOADER_AVAILABLE = True
+except ImportError:
+    DOWNLOADER_AVAILABLE = False
+    print("[WARNING] Downloader module not available")
 
 
 # =============================================================================
-# LOGGING FUNCTIONS (Inline)
+# GLOBAL APPLICATION STATE
+# =============================================================================
+
+class AppController:
+    """
+    Application controller that manages UI state and business logic.
+    Separates concerns between UI and core functionality.
+    """
+    
+    def __init__(self):
+        self.ui_state: Optional[UIState] = None
+        self.page: Optional[ft.Page] = None
+        self.file_picker: Optional[ft.FilePicker] = None
+        
+        # Processing state
+        self.current_urls: List[str] = []
+        self.is_processing: bool = False
+        self.scraped_results: List[dict] = []
+        
+        # Core components (lazy initialized)
+        self._scraper: Optional[WebScraper] = None
+        self._analyzer: Optional[AIAnalyzer] = None
+        self._downloader: Optional[ModelDownloader] = None
+    
+    @property
+    def scraper(self) -> Optional[WebScraper]:
+        """Lazy-load scraper instance."""
+        if self._scraper is None and SCRAPER_AVAILABLE:
+            self._scraper = create_scraper(headless=True)
+        return self._scraper
+    
+    @property
+    def analyzer(self) -> Optional[AIAnalyzer]:
+        """Lazy-load analyzer instance."""
+        if self._analyzer is None and ANALYZER_AVAILABLE:
+            self._analyzer = create_analyzer()
+        return self._analyzer
+    
+    @property
+    def downloader(self) -> Optional[ModelDownloader]:
+        """Lazy-load downloader instance."""
+        if self._downloader is None and DOWNLOADER_AVAILABLE:
+            self._downloader = ModelDownloader()
+        return self._downloader
+
+
+# Global controller instance
+APP = AppController()
+
+
+# =============================================================================
+# LOGGING FUNCTIONS
 # =============================================================================
 
 def log_to_terminal(message: str, status: str = "info") -> None:
-    """Add a log entry to the terminal."""
-    if STATE.log_column is None:
+    """
+    Add a log entry to the terminal display.
+    
+    Args:
+        message: Log message text
+        status: Log type ("info", "success", "error", "warning", "ai")
+    """
+    if APP.ui_state is None or APP.ui_state.log_column is None:
         print(f"[{status.upper()}] {message}")
         return
     
     color_map = {
-        "info": Colors.TEXT_SECONDARY,
-        "success": Colors.SUCCESS,
-        "error": Colors.ERROR,
-        "warning": Colors.WARNING,
-        "ai": Colors.PRIMARY,
+        "info": COLORS.TEXT_SECONDARY,
+        "success": COLORS.SUCCESS,
+        "error": COLORS.ERROR,
+        "warning": COLORS.WARNING,
+        "ai": COLORS.PRIMARY,
     }
-    color = color_map.get(status, Colors.TEXT_SECONDARY)
+    
+    color = color_map.get(status, COLORS.TEXT_SECONDARY)
     timestamp = datetime.now().strftime("%H:%M:%S")
     
-    log_row = ft.Row(
+    log_entry = ft.Row(
         controls=[
             ft.Text(
                 f"[{timestamp}]",
-                color=Colors.TEXT_MUTED,
+                color=COLORS.TEXT_MUTED,
                 size=11,
                 font_family="Consolas",
             ),
@@ -108,461 +151,109 @@ def log_to_terminal(message: str, status: str = "info") -> None:
         spacing=8,
     )
     
-    STATE.log_column.controls.append(log_row)
+    APP.ui_state.log_column.controls.append(log_entry)
     
-    # Limit log entries
-    if len(STATE.log_column.controls) > 200:
-        STATE.log_column.controls.pop(0)
+    # Limit log entries to prevent memory issues
+    if len(APP.ui_state.log_column.controls) > 200:
+        APP.ui_state.log_column.controls.pop(0)
     
     try:
-        STATE.log_column.update()
+        APP.ui_state.log_column.update()
     except Exception:
         pass
 
 
+def clear_terminal() -> None:
+    """Clear all log entries from terminal."""
+    if APP.ui_state and APP.ui_state.log_column:
+        APP.ui_state.log_column.controls.clear()
+        try:
+            APP.ui_state.log_column.update()
+        except Exception:
+            pass
+
+
 # =============================================================================
-# FILE HANDLING FUNCTIONS (Simplified/Mock)
+# URL AND FILE PROCESSING
 # =============================================================================
 
 def extract_urls_from_text(text: str) -> List[str]:
-    """Extract URLs from text content."""
-    import re
+    """
+    Extract valid URLs from text content.
+    
+    Args:
+        text: Text that may contain URLs
+    
+    Returns:
+        List of unique, valid URLs
+    """
+    # Pattern matches http/https URLs and www. prefixed domains
     url_pattern = r'https?://[^\s<>"\')\]]+|www\.[^\s<>"\')\]]+'
+    
     urls = re.findall(url_pattern, text)
-    # Add https:// to www URLs
-    urls = [f"https://{url}" if url.startswith("www.") else url for url in urls]
-    return list(set(urls))
+    
+    # Normalize URLs (add https:// to www. URLs)
+    normalized = []
+    for url in urls:
+        if url.startswith("www."):
+            url = f"https://{url}"
+        # Clean trailing punctuation that might have been captured
+        url = url.rstrip(".,;:!?")
+        normalized.append(url)
+    
+    # Return unique URLs, preserving order
+    seen = set()
+    unique = []
+    for url in normalized:
+        if url not in seen:
+            seen.add(url)
+            unique.append(url)
+    
+    return unique
 
 
 async def read_file_content(file_path: str) -> str:
-    """Read file content (simplified)."""
+    """
+    Read content from a file asynchronously.
+    
+    Args:
+        file_path: Path to file
+    
+    Returns:
+        File content as string
+    """
     path = Path(file_path)
+    
     try:
         if path.suffix.lower() == '.txt':
             return path.read_text(encoding='utf-8')
+        
         elif path.suffix.lower() == '.docx':
-            # Mock for now - would need python-docx
-            return f"[Contenido de {path.name}]"
+            # Try to use python-docx if available
+            try:
+                from docx import Document
+                doc = Document(str(path))
+                return '\n'.join(para.text for para in doc.paragraphs)
+            except ImportError:
+                log_to_terminal("python-docx no instalado, leyendo como texto", "warning")
+                return path.read_text(encoding='utf-8', errors='ignore')
+        
         else:
+            log_to_terminal(f"Formato no soportado: {path.suffix}", "warning")
             return ""
+    
     except Exception as e:
         log_to_terminal(f"Error leyendo {path.name}: {e}", "error")
         return ""
 
 
-# =============================================================================
-# UI COMPONENT FACTORY FUNCTIONS
-# =============================================================================
-
-def create_prisma_button(
-    text: str,
-    icon: Optional[str] = None,
-    variant: str = "primary",
-    on_click: Optional[Callable] = None,
-    disabled: bool = False,
-    expand: bool = False,
-) -> ft.Container:
-    """Create a styled button without class inheritance issues."""
-    
-    if variant == "primary":
-        bg_color = Colors.PRIMARY
-        text_color = Colors.TEXT_ON_PRIMARY
-        hover_color = Colors.PRIMARY_HOVER
-    elif variant == "secondary":
-        bg_color = Colors.SURFACE
-        text_color = Colors.TEXT_PRIMARY
-        hover_color = Colors.SURFACE_HOVER
-    else:
-        bg_color = "transparent"
-        text_color = Colors.TEXT_SECONDARY
-        hover_color = Colors.SURFACE_HOVER
-    
-    if disabled:
-        bg_color = Colors.SURFACE
-        text_color = Colors.TEXT_MUTED
-    
-    # Build content
-    content_controls = []
-    if icon:
-        content_controls.append(
-            ft.Icon(icon, size=18, color=text_color)
-        )
-    content_controls.append(
-        ft.Text(text, size=14, weight=ft.FontWeight.W_500, color=text_color)
-    )
-    
-    btn = ft.Container(
-        content=ft.Row(
-            controls=content_controls,
-            spacing=8,
-            alignment=ft.MainAxisAlignment.CENTER,
-            tight=True,
-        ),
-        bgcolor=bg_color,
-        border_radius=8,
-        padding=ft.padding.symmetric(horizontal=24, vertical=12),
-        height=48,
-        expand=expand,
-        ink=not disabled,
-    )
-    
-    # Store colors for hover effect
-    btn.data = {"bg": bg_color, "hover": hover_color, "disabled": disabled}
-    
-    # Assign events AFTER creation
-    if on_click and not disabled:
-        btn.on_click = on_click
-    
-    if not disabled:
-        def handle_hover(e):
-            if btn.data.get("disabled"):
-                return
-            btn.bgcolor = btn.data["hover"] if e.data == "true" else btn.data["bg"]
-            btn.update()
-        btn.on_hover = handle_hover
-    
-    return btn
-
-
-def create_header_section() -> ft.Container:
-    """Create the header section."""
-    return ft.Container(
-        content=ft.Row(
-            controls=[
-                ft.Container(
-                    content=ft.Icon("auto_awesome", size=32, color=Colors.PRIMARY),
-                    bgcolor=Colors.SURFACE,
-                    border_radius=8,
-                    padding=8,
-                ),
-                ft.Column(
-                    controls=[
-                        ft.Text(
-                            Config.APP_NAME,
-                            size=24,
-                            weight=ft.FontWeight.W_700,
-                            color=Colors.TEXT_PRIMARY,
-                        ),
-                        ft.Text(
-                            Config.APP_SUBTITLE,
-                            size=12,
-                            color=Colors.TEXT_SECONDARY,
-                        ),
-                    ],
-                    spacing=0,
-                ),
-            ],
-            spacing=16,
-        ),
-        bgcolor=Colors.BACKGROUND,
-        padding=ft.padding.only(left=24, right=24, top=16, bottom=8),
-        height=80,  # FIXED HEIGHT
-    )
-
-
-def create_input_section(page: ft.Page) -> ft.Container:
-    """Create the input/drag-drop section."""
-    
-    # File picker - create empty first
-    STATE.file_picker = ft.FilePicker()
-    
-    # URL input field
-    STATE.url_input = ft.TextField(
-        hint_text="Pega URLs aquí (una por línea)...",
-        multiline=True,
-        min_lines=3,
-        max_lines=5,
-        border_color=Colors.SURFACE_BORDER,
-        focused_border_color=Colors.PRIMARY,
-        bgcolor=Colors.SURFACE,
-        color=Colors.TEXT_PRIMARY,
-        cursor_color=Colors.PRIMARY,
-        hint_style=ft.TextStyle(color=Colors.TEXT_MUTED),
-        border_radius=8,
-        text_size=12,
-    )
-    
-    # Browse button
-    browse_btn = create_prisma_button(
-        text="Seleccionar Archivos",
-        icon="folder_open_rounded",
-        variant="secondary",
-    )
-    
-    # URL counter
-    STATE.url_counter = ft.Text(
-        "0 enlaces detectados",
-        size=12,
-        color=Colors.TEXT_SECONDARY,
-    )
-    
-    # Build the drag-drop zone content
-    drag_zone = ft.Container(
-        content=ft.Column(
-            controls=[
-                ft.Icon("upload_file_rounded", size=48, color=Colors.TEXT_MUTED),
-                ft.Text(
-                    "Arrastra archivos .txt o .docx aquí",
-                    color=Colors.TEXT_SECONDARY,
-                    size=14,
-                ),
-                ft.Container(height=10),
-                browse_btn,
-                ft.Container(height=10),
-                ft.Text(
-                    "— o pega URLs directamente —",
-                    size=12,
-                    color=Colors.TEXT_MUTED,
-                ),
-                STATE.url_input,
-            ],
-            horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-            spacing=5,
-        ),
-        bgcolor=Colors.SURFACE,
-        border=ft.border.all(2, Colors.SURFACE_BORDER),
-        border_radius=12,
-        padding=24,
-        expand=True,  # Expand within fixed-height parent
-    )
-    
-    # Connect file picker events AFTER creation
-    def handle_file_result(e: ft.ControlEvent):
-        if e.files:
-            file_paths = [f.path for f in e.files]
-            log_to_terminal(f"Archivos recibidos: {len(file_paths)}", "info")
-            asyncio.create_task(process_dropped_files(file_paths))
-    
-    STATE.file_picker.on_result = handle_file_result
-    browse_btn.on_click = lambda _: STATE.file_picker.pick_files(
-        allow_multiple=True,
-        allowed_extensions=["txt", "docx"],
-    )
-    
-    # Full input section
-    input_section = ft.Container(
-        content=ft.Column(
-            controls=[
-                STATE.file_picker,  # Hidden file picker
-                ft.Text(
-                    "ENTRADA",
-                    size=11,
-                    weight=ft.FontWeight.W_600,
-                    color=Colors.TEXT_MUTED,
-                ),
-                drag_zone,
-                ft.Row(
-                    controls=[
-                        ft.Icon("link_rounded", size=16, color=Colors.TEXT_SECONDARY),
-                        STATE.url_counter,
-                    ],
-                    spacing=8,
-                ),
-            ],
-            spacing=10,
-        ),
-        bgcolor=Colors.BACKGROUND,
-        padding=16,
-        width=500,  # FIXED WIDTH instead of expand
-    )
-    
-    return input_section
-
-
-def create_terminal_section() -> ft.Container:
-    """Create the terminal/log section."""
-    
-    # Log column with auto-scroll
-    STATE.log_column = ft.Column(
-        controls=[],
-        spacing=2,
-        scroll=ft.ScrollMode.AUTO,
-        auto_scroll=True,
-    )
-    
-    # Terminal container
-    terminal = ft.Container(
-        content=STATE.log_column,
-        bgcolor=Colors.TERMINAL_BG,
-        border_radius=8,
-        border=ft.border.all(1, Colors.SURFACE_BORDER),
-        padding=16,
-        expand=True,  # Expand within fixed container
-    )
-    
-    # Report button (hidden initially)
-    STATE.report_btn = create_prisma_button(
-        text="Ver Reporte",
-        icon="description_rounded",
-        variant="secondary",
-        expand=True,
-    )
-    STATE.report_btn.visible = False
-    
-    # Full terminal section
-    terminal_section = ft.Container(
-        content=ft.Column(
-            controls=[
-                ft.Text(
-                    "TERMINAL",
-                    size=11,
-                    weight=ft.FontWeight.W_600,
-                    color=Colors.TEXT_MUTED,
-                ),
-                terminal,
-                STATE.report_btn,
-            ],
-            spacing=10,
-        ),
-        bgcolor=Colors.BACKGROUND,
-        padding=16,
-        expand=1,  # Use expand=1 (integer) instead of True
-    )
-    
-    return terminal_section
-
-
-def create_control_panel(on_execute: Callable) -> ft.Container:
-    """Create the bottom control panel."""
-    
-    # AI Switch
-    STATE.ai_switch = ft.Switch(
-        value=False,
-        active_color=Colors.PRIMARY,
-        inactive_track_color=Colors.SURFACE_BORDER,
-    )
-    
-    ai_switch_row = ft.Container(
-        content=ft.Row(
-            controls=[
-                STATE.ai_switch,
-                ft.Text(
-                    "Análisis con IA",
-                    color=Colors.TEXT_PRIMARY,
-                    size=14,
-                ),
-            ],
-            spacing=8,
-        ),
-        padding=ft.padding.symmetric(vertical=8),
-    )
-    
-    # Execute button
-    STATE.execute_btn = create_prisma_button(
-        text="EJECUTAR INVESTIGACIÓN",
-        icon="rocket_launch_rounded",
-        variant="primary",
-        expand=True,
-    )
-    STATE.execute_btn.on_click = lambda _: on_execute()
-    
-    # Control panel container
-    control_panel = ft.Container(
-        content=ft.Column(
-            controls=[
-                ft.Row(
-                    controls=[ai_switch_row],
-                    alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
-                ),
-                STATE.execute_btn,
-            ],
-            spacing=16,
-        ),
-        bgcolor=Colors.SURFACE,
-        padding=24,
-        border=ft.border.only(top=ft.BorderSide(1, Colors.SURFACE_BORDER)),
-        height=120,  # FIXED HEIGHT
-    )
-    
-    return control_panel
-
-
-def create_status_bar() -> ft.Container:
-    """Create the bottom status bar."""
-    return ft.Container(
-        content=ft.Row(
-            controls=[
-                ft.Icon("circle", size=8, color=Colors.SUCCESS),
-                ft.Text(
-                    "Listo",
-                    size=12,
-                    color=Colors.TEXT_MUTED,
-                ),
-                ft.Container(expand=True),
-                ft.Text(
-                    f"{Config.APP_NAME} v1.0.0",
-                    size=11,
-                    color=Colors.TEXT_MUTED,
-                ),
-            ],
-            spacing=8,
-        ),
-        bgcolor=Colors.BACKGROUND,
-        padding=ft.padding.symmetric(horizontal=16, vertical=8),
-        border=ft.border.only(top=ft.BorderSide(1, Colors.SURFACE_BORDER)),
-        height=36,  # FIXED HEIGHT
-    )
-
-
-# =============================================================================
-# MAIN LAYOUT BUILDER (Function, not class!)
-# =============================================================================
-
-def build_main_layout(page: ft.Page, on_execute: Callable) -> ft.Container:
-    """
-    Build the complete main layout using functions instead of nested classes.
-    This avoids the expand=True inheritance bug in Flet 0.80.2.
-    """
-    
-    # Create all sections
-    header = create_header_section()
-    input_section = create_input_section(page)
-    terminal_section = create_terminal_section()
-    control_panel = create_control_panel(on_execute)
-    status_bar = create_status_bar()
-    
-    # Main content area (Input + Terminal side by side)
-    # Using FIXED widths and calculated heights instead of expand chains
-    main_content = ft.Container(
-        content=ft.Row(
-            controls=[
-                input_section,
-                ft.VerticalDivider(width=1, color=Colors.SURFACE_BORDER),
-                terminal_section,
-            ],
-            spacing=0,
-            vertical_alignment=ft.CrossAxisAlignment.STRETCH,
-        ),
-        expand=True,  # Only ONE expand=True at this level
-        bgcolor=Colors.BACKGROUND,
-    )
-    
-    # Full layout column
-    main_layout = ft.Container(
-        content=ft.Column(
-            controls=[
-                header,
-                ft.Divider(height=1, color=Colors.SURFACE_BORDER),
-                main_content,
-                control_panel,
-                status_bar,
-            ],
-            spacing=0,
-            expand=True,
-        ),
-        bgcolor=Colors.BACKGROUND,
-        expand=True,
-    )
-    
-    return main_layout
-
-
-# =============================================================================
-# APPLICATION LOGIC
-# =============================================================================
-
 async def process_dropped_files(file_paths: List[str]) -> None:
-    """Process dropped files and extract URLs."""
+    """
+    Process dropped/selected files and extract URLs.
+    
+    Args:
+        file_paths: List of file paths to process
+    """
     all_urls = []
     
     for path_str in file_paths:
@@ -578,170 +269,470 @@ async def process_dropped_files(file_paths: List[str]) -> None:
                 log_to_terminal(f"  → {len(urls)} URLs encontradas", "success")
             else:
                 log_to_terminal(f"  → Sin URLs válidas", "warning")
-                
+        
         except Exception as e:
-            log_to_terminal(f"Error: {e}", "error")
+            log_to_terminal(f"Error procesando {path.name}: {e}", "error")
     
-    # Update state
-    STATE.current_urls = list(set(all_urls))
+    # Update global state with unique URLs
+    APP.current_urls = list(set(all_urls))
     
-    # Update counter
-    if STATE.url_counter:
-        STATE.url_counter.value = f"{len(STATE.current_urls)} enlaces detectados"
-        STATE.url_counter.update()
+    # Update UI counter
+    if APP.ui_state:
+        update_url_counter(APP.ui_state, len(APP.current_urls))
     
-    if STATE.current_urls:
+    if APP.current_urls:
         log_to_terminal(
-            f"✓ {len(STATE.current_urls)} URLs válidas en total",
+            f"✓ {len(APP.current_urls)} URLs válidas en total",
             "success"
         )
+
+
+# =============================================================================
+# MAIN PIPELINE EXECUTION
+# =============================================================================
+
+async def execute_scraping_phase() -> List[dict]:
+    """
+    Execute the web scraping phase.
+    
+    Returns:
+        List of scrape results as dictionaries
+    """
+    results = []
+    total = len(APP.current_urls)
+    
+    log_to_terminal("═" * 45, "info")
+    log_to_terminal("FASE 1: SCRAPING WEB", "info")
+    log_to_terminal("═" * 45, "info")
+    
+    if APP.scraper:
+        # Use real scraper if available
+        def progress_callback(current: int, total: int, url: str):
+            domain = url.split('/')[2] if '/' in url else url[:30]
+            log_to_terminal(f"[{current}/{total}] {domain}", "info")
+            
+            if APP.ui_state:
+                progress = current / total * 0.5  # First 50% for scraping
+                show_progress(APP.ui_state, True, progress)
+        
+        APP.scraper.set_progress_callback(progress_callback)
+        
+        try:
+            scrape_results = await APP.scraper.scrape_urls(APP.current_urls)
+            
+            for result in scrape_results:
+                if result.success:
+                    log_to_terminal(f"  ✓ {result.title[:40]}...", "success")
+                    results.append({
+                        "url": result.url,
+                        "title": result.title,
+                        "content": result.markdown,
+                        "success": True,
+                    })
+                else:
+                    log_to_terminal(f"  ✗ Error: {result.error[:50]}", "error")
+                    results.append({
+                        "url": result.url,
+                        "success": False,
+                        "error": result.error,
+                    })
+        
+        except Exception as e:
+            log_to_terminal(f"Error en scraper: {e}", "error")
+    
+    else:
+        # Mock scraping for UI testing when scraper not available
+        for i, url in enumerate(APP.current_urls, 1):
+            domain = url.split('/')[2] if '/' in url else url[:30]
+            log_to_terminal(f"[{i}/{total}] Scrapeando: {domain}...", "info")
+            
+            # Simulate work
+            await asyncio.sleep(0.3)
+            
+            log_to_terminal(f"  ✓ Completado (mock)", "success")
+            results.append({
+                "url": url,
+                "title": f"Mock Title for {domain}",
+                "content": f"# Mock Content\n\nContent from {url}",
+                "success": True,
+            })
+            
+            if APP.ui_state:
+                progress = i / total * 0.5
+                show_progress(APP.ui_state, True, progress)
+    
+    successful = sum(1 for r in results if r.get("success"))
+    log_to_terminal(f"✓ {successful}/{total} páginas scrapeadas", "success")
+    
+    return results
+
+
+async def execute_analysis_phase(scraped_contents: List[str]) -> Optional[str]:
+    """
+    Execute the AI analysis phase.
+    
+    Args:
+        scraped_contents: List of scraped markdown contents
+    
+    Returns:
+        Generated report content or None if failed
+    """
+    log_to_terminal("═" * 45, "ai")
+    log_to_terminal("FASE 2: ANÁLISIS CON IA", "ai")
+    log_to_terminal("═" * 45, "ai")
+    
+    if APP.analyzer:
+        # Check if model is available
+        if APP.downloader and not APP.downloader.is_model_available():
+            log_to_terminal("Modelo no encontrado. Descargando...", "ai")
+            
+            def download_progress(progress: float, message: str):
+                log_to_terminal(message, "ai")
+                if APP.ui_state:
+                    # Map download progress to 50-70% of total
+                    total_progress = 0.5 + (progress * 0.2)
+                    show_progress(APP.ui_state, True, total_progress)
+            
+            APP.downloader.set_progress_callback(download_progress)
+            success = await APP.downloader.download_model()
+            
+            if not success:
+                log_to_terminal("Error descargando modelo", "error")
+                return None
+        
+        # Load model
+        log_to_terminal("Cargando modelo en memoria...", "ai")
+        if not await APP.analyzer.load_model():
+            log_to_terminal("Error cargando modelo", "error")
+            return None
+        
+        # Generate report
+        log_to_terminal("Generando análisis...", "ai")
+        
+        if APP.ui_state:
+            show_progress(APP.ui_state, True, 0.8)
+        
+        result = await APP.analyzer.generate_research_report(
+            scraped_contents,
+            topic="Investigación PRISMA"
+        )
+        
+        if result.success:
+            log_to_terminal("✓ Análisis completado", "success")
+            return result.summary
+        else:
+            log_to_terminal(f"Error en análisis: {result.error}", "error")
+            return None
+    
+    else:
+        # Mock analysis for UI testing
+        log_to_terminal("Cargando modelo...", "ai")
+        await asyncio.sleep(0.8)
+        
+        if APP.ui_state:
+            show_progress(APP.ui_state, True, 0.6)
+        
+        log_to_terminal("Analizando contenido...", "ai")
+        await asyncio.sleep(1.0)
+        
+        if APP.ui_state:
+            show_progress(APP.ui_state, True, 0.8)
+        
+        log_to_terminal("Generando informe...", "ai")
+        await asyncio.sleep(0.8)
+        
+        mock_report = f"""# Informe de Investigación PRISMA
+
+## Resumen Ejecutivo
+
+Este informe analiza {len(scraped_contents)} fuentes web recopiladas automáticamente.
+
+## Puntos Clave
+
+1. Se procesaron exitosamente todas las URLs proporcionadas
+2. El contenido fue extraído y convertido a formato Markdown
+3. Este es un reporte de demostración (módulo de IA no disponible)
+
+## Conclusiones
+
+El sistema PRISMA funcionó correctamente en modo de prueba.
+
+---
+*Generado por PRISMA v{CONFIG.APP_VERSION}*
+"""
+        
+        log_to_terminal("✓ Análisis completado (mock)", "success")
+        return mock_report
+
+
+async def save_report(content: str, filename: str = None) -> Path:
+    """
+    Save the generated report to disk.
+    
+    Args:
+        content: Report content in Markdown
+        filename: Optional custom filename
+    
+    Returns:
+        Path to saved file
+    """
+    output_dir = Path("output")
+    output_dir.mkdir(exist_ok=True)
+    
+    if filename is None:
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"prisma_report_{timestamp}.md"
+    
+    file_path = output_dir / filename
+    file_path.write_text(content, encoding='utf-8')
+    
+    return file_path
 
 
 async def execute_pipeline() -> None:
-    """Execute the scraping/analysis pipeline (MOCK for UI testing)."""
-    
-    if STATE.is_processing:
+    """
+    Execute the complete scraping and analysis pipeline.
+    """
+    if APP.is_processing:
+        log_to_terminal("Ya hay un proceso en ejecución", "warning")
         return
     
-    # Get URLs from text input
-    if STATE.url_input and STATE.url_input.value:
-        manual_urls = extract_urls_from_text(STATE.url_input.value)
-        STATE.current_urls.extend(manual_urls)
-        STATE.current_urls = list(set(STATE.current_urls))
+    # Collect URLs from text input
+    if APP.ui_state and APP.ui_state.url_input and APP.ui_state.url_input.value:
+        manual_urls = extract_urls_from_text(APP.ui_state.url_input.value)
+        APP.current_urls.extend(manual_urls)
+        APP.current_urls = list(set(APP.current_urls))
+        update_url_counter(APP.ui_state, len(APP.current_urls))
     
-    if not STATE.current_urls:
+    if not APP.current_urls:
         log_to_terminal("No hay URLs para procesar", "warning")
         return
     
-    STATE.is_processing = True
+    # Mark as processing
+    APP.is_processing = True
     
-    # Update button state
-    if STATE.execute_btn:
-        STATE.execute_btn.data["disabled"] = True
-        STATE.execute_btn.bgcolor = Colors.SURFACE
-        # Update text
-        btn_content = STATE.execute_btn.content
-        if isinstance(btn_content, ft.Row) and len(btn_content.controls) > 1:
-            text_ctrl = btn_content.controls[-1]
-            if isinstance(text_ctrl, ft.Text):
-                text_ctrl.value = "PROCESANDO..."
-                text_ctrl.color = Colors.TEXT_MUTED
-        STATE.execute_btn.update()
+    # Update UI state
+    if APP.ui_state:
+        set_button_state(APP.ui_state.execute_btn, disabled=True, text="PROCESANDO...")
+        set_status(APP.ui_state, "Procesando...", "processing")
+        show_progress(APP.ui_state, True, 0)
     
     try:
-        use_ai = STATE.ai_switch.value if STATE.ai_switch else False
+        # Phase 1: Scraping
+        results = await execute_scraping_phase()
+        APP.scraped_results = results
         
-        # Phase 1: Scraping (MOCK)
-        log_to_terminal("═" * 40, "info")
-        log_to_terminal("FASE 1: SCRAPING", "info")
-        log_to_terminal("═" * 40, "info")
+        # Collect successful content
+        scraped_contents = [
+            r["content"] for r in results
+            if r.get("success") and r.get("content")
+        ]
         
-        for i, url in enumerate(STATE.current_urls, 1):
-            domain = url.split('/')[2] if '/' in url else url[:30]
-            log_to_terminal(f"[{i}/{len(STATE.current_urls)}] Scrapeando: {domain}...", "info")
-            await asyncio.sleep(0.5)  # Simulate work
-            log_to_terminal(f"  → Completado (mock)", "success")
+        # Save individual scraped files
+        output_dir = Path("output")
+        output_dir.mkdir(exist_ok=True)
         
-        log_to_terminal(
-            f"✓ {len(STATE.current_urls)}/{len(STATE.current_urls)} páginas scrapeadas",
-            "success"
-        )
+        for i, result in enumerate(results):
+            if result.get("success"):
+                safe_title = re.sub(r'[^\w\s-]', '', result.get("title", f"page_{i}")[:30])
+                filename = f"scraped_{i+1}_{safe_title}.md"
+                (output_dir / filename).write_text(result.get("content", ""), encoding='utf-8')
         
-        # Phase 2: AI Analysis (MOCK)
-        if use_ai:
-            log_to_terminal("═" * 40, "ai")
-            log_to_terminal("FASE 2: ANÁLISIS IA", "ai")
-            log_to_terminal("═" * 40, "ai")
+        # Phase 2: AI Analysis (if enabled)
+        use_ai = APP.ui_state and APP.ui_state.ai_switch and APP.ui_state.ai_switch.value
+        
+        if use_ai and scraped_contents:
+            report = await execute_analysis_phase(scraped_contents)
             
-            log_to_terminal("Cargando modelo...", "ai")
-            await asyncio.sleep(1)
-            
-            log_to_terminal("Analizando contenido...", "ai")
-            await asyncio.sleep(1.5)
-            
-            log_to_terminal("Generando informe...", "ai")
-            await asyncio.sleep(1)
-            
-            log_to_terminal("✓ Reporte generado: report_20260122.md", "success")
-            
-            # Show report button
-            if STATE.report_btn:
-                STATE.report_btn.visible = True
-                STATE.report_btn.update()
+            if report:
+                report_path = await save_report(report)
+                log_to_terminal(f"✓ Reporte guardado: {report_path.name}", "success")
+                
+                # Show report button
+                if APP.ui_state and APP.ui_state.report_btn:
+                    APP.ui_state.report_btn.visible = True
+                    APP.ui_state.report_btn.data["report_path"] = str(report_path)
+                    
+                    def open_report(e):
+                        import subprocess
+                        import sys
+                        path = e.control.data.get("report_path")
+                        if path:
+                            if sys.platform == "win32":
+                                subprocess.run(["start", "", path], shell=True)
+                            elif sys.platform == "darwin":
+                                subprocess.run(["open", path])
+                            else:
+                                subprocess.run(["xdg-open", path])
+                    
+                    APP.ui_state.report_btn.on_click = open_report
+                    
+                    try:
+                        APP.ui_state.report_btn.update()
+                    except Exception:
+                        pass
         
         # Completion
-        log_to_terminal("═" * 40, "success")
+        log_to_terminal("═" * 45, "success")
         log_to_terminal("✓ PROCESO COMPLETADO", "success")
-        log_to_terminal("═" * 40, "success")
+        log_to_terminal(f"  Archivos guardados en: ./output/", "info")
+        log_to_terminal("═" * 45, "success")
         
+        if APP.ui_state:
+            show_progress(APP.ui_state, True, 1.0)
+            set_status(APP.ui_state, "Completado", "success")
+    
     except Exception as e:
-        log_to_terminal(f"Error: {e}", "error")
+        log_to_terminal(f"Error fatal: {e}", "error")
+        if APP.ui_state:
+            set_status(APP.ui_state, "Error", "error")
     
     finally:
-        STATE.is_processing = False
+        # Reset processing state
+        APP.is_processing = False
         
-        # Reset button
-        if STATE.execute_btn:
-            STATE.execute_btn.data["disabled"] = False
-            STATE.execute_btn.bgcolor = Colors.PRIMARY
-            btn_content = STATE.execute_btn.content
-            if isinstance(btn_content, ft.Row) and len(btn_content.controls) > 1:
-                text_ctrl = btn_content.controls[-1]
-                if isinstance(text_ctrl, ft.Text):
-                    text_ctrl.value = "EJECUTAR INVESTIGACIÓN"
-                    text_ctrl.color = Colors.TEXT_ON_PRIMARY
-            STATE.execute_btn.update()
+        if APP.ui_state:
+            set_button_state(
+                APP.ui_state.execute_btn,
+                disabled=False,
+                text="EJECUTAR INVESTIGACIÓN"
+            )
+            
+            # Hide progress after delay
+            await asyncio.sleep(2)
+            show_progress(APP.ui_state, False)
 
 
-def handle_execute():
-    """Handle execute button click."""
+def handle_execute_click() -> None:
+    """Handle execute button click - bridge to async."""
     asyncio.create_task(execute_pipeline())
 
 
 # =============================================================================
-# MAIN ENTRY POINT
+# FILE PICKER EVENT HANDLER
+# =============================================================================
+
+def handle_file_picker_result(e: ft.ControlEvent) -> None:
+    """
+    Handle file picker result event.
+    
+    This is called when user selects files via the file browser.
+    """
+    if e.files:
+        file_paths = [f.path for f in e.files if f.path]
+        
+        if file_paths:
+            log_to_terminal(f"Archivos seleccionados: {len(file_paths)}", "info")
+            asyncio.create_task(process_dropped_files(file_paths))
+
+
+# =============================================================================
+# MAIN APPLICATION ENTRY POINT
 # =============================================================================
 
 def main(page: ft.Page) -> None:
-    """Main entry point for Flet application."""
+    """
+    Main entry point for the Flet application.
     
-    # Configure page
-    page.title = f"{Config.APP_NAME} - {Config.APP_SUBTITLE}"
-    page.bgcolor = Colors.BACKGROUND
+    CRITICAL INITIALIZATION ORDER:
+    1. Configure page settings
+    2. Create FilePicker and add to page.overlay IMMEDIATELY
+    3. Build UI (passing FilePicker reference)
+    4. Add UI to page
+    """
+    
+    # Store page reference
+    APP.page = page
+    
+    # =========================================================================
+    # STEP 1: Configure page
+    # =========================================================================
+    
+    page.title = f"{CONFIG.APP_NAME} - {CONFIG.APP_SUBTITLE}"
+    page.bgcolor = COLORS.BACKGROUND
     page.padding = 0
     page.spacing = 0
     page.theme_mode = ft.ThemeMode.DARK
     
-    # Window settings
+    # Window configuration (Flet 0.80+ syntax with fallback)
     try:
-        page.window.width = Config.WINDOW_WIDTH
-        page.window.height = Config.WINDOW_HEIGHT
-        page.window.min_width = Config.WINDOW_MIN_WIDTH
-        page.window.min_height = Config.WINDOW_MIN_HEIGHT
+        page.window.width = CONFIG.WINDOW_WIDTH
+        page.window.height = CONFIG.WINDOW_HEIGHT
+        page.window.min_width = CONFIG.WINDOW_MIN_WIDTH
+        page.window.min_height = CONFIG.WINDOW_MIN_HEIGHT
+        # Don't call center() as it's async and not needed
     except AttributeError:
         # Fallback for older Flet versions
         try:
-            page.window_width = Config.WINDOW_WIDTH
-            page.window_height = Config.WINDOW_HEIGHT
-            page.window_min_width = Config.WINDOW_MIN_WIDTH
-            page.window_min_height = Config.WINDOW_MIN_HEIGHT
+            page.window_width = CONFIG.WINDOW_WIDTH
+            page.window_height = CONFIG.WINDOW_HEIGHT
+            page.window_min_width = CONFIG.WINDOW_MIN_WIDTH
+            page.window_min_height = CONFIG.WINDOW_MIN_HEIGHT
         except Exception as e:
-            print(f"Warning: Could not set window size: {e}")
+            print(f"[WARNING] Could not configure window: {e}")
     
-    # Build and add layout
-    layout = build_main_layout(page, handle_execute)
-    page.add(layout)
+    # =========================================================================
+    # STEP 2: Create FilePicker and add to overlay FIRST
+    # =========================================================================
     
-    # Force update
+    # Create the FilePicker instance (no on_result in constructor for Flet 0.80+)
+    file_picker = ft.FilePicker()
+
+    # Set event handler AFTER creation
+    file_picker.on_result = handle_file_picker_result
+
+    # Store reference in controller
+    APP.file_picker = file_picker
+    
+    # CRITICAL: Add to page.overlay BEFORE building any UI
+    # This prevents the "Unknown control: FilePicker" red box error
+    page.overlay.append(file_picker)
+    
+    # =========================================================================
+    # STEP 3: Build UI (passing FilePicker as dependency)
+    # =========================================================================
+    
+    # Build the complete UI, passing file_picker reference
+    main_layout, ui_state = build_app_ui(
+        page=page,
+        file_picker=file_picker,
+        on_execute=handle_execute_click,
+    )
+    
+    # Store UI state in controller
+    APP.ui_state = ui_state
+    
+    # =========================================================================
+    # STEP 4: Add UI to page
+    # =========================================================================
+    
+    page.add(main_layout)
+    
+    # Force initial update
     page.update()
     
-    # Initial log
+    # =========================================================================
+    # STEP 5: Initial logging
+    # =========================================================================
+    
     log_to_terminal("PRISMA iniciado correctamente", "success")
+    log_to_terminal(f"Versión: {CONFIG.APP_VERSION}", "info")
     log_to_terminal("Esperando input...", "info")
+    
+    # Check module availability
+    if not SCRAPER_AVAILABLE:
+        log_to_terminal("⚠ Módulo scraper no disponible (modo mock)", "warning")
+    if not ANALYZER_AVAILABLE:
+        log_to_terminal("⚠ Módulo analyzer no disponible (modo mock)", "warning")
     
     # Final update
     page.update()
 
 
+# =============================================================================
+# APPLICATION STARTUP
+# =============================================================================
+
 if __name__ == "__main__":
+    # Run the Flet application
     ft.app(target=main)

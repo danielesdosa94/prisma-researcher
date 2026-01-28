@@ -10,8 +10,16 @@ from typing import List, Optional, Callable
 from dataclasses import dataclass
 from pathlib import Path
 
-from src.utils.logger import PrismaLogger
-from src.core.downloader import ModelDownloader
+try:
+    from src.utils.logger import PrismaLogger
+    from src.core.downloader import ModelDownloader
+except ImportError:
+    # Fallback for direct module testing
+    import sys
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+    from src.utils.logger import PrismaLogger
+    from src.core.downloader import ModelDownloader
 
 logger = PrismaLogger("Analyzer")
 

@@ -93,7 +93,7 @@ class AppConfig:
     """Application-wide configuration."""
     
     APP_NAME: Final[str] = "PRISMA"
-    APP_VERSION: Final[str] = "1.0.0"
+    APP_VERSION: Final[str] = "2.0.0"
     APP_SUBTITLE: Final[str] = "Investigación Automatizada"
     
     # Window settings

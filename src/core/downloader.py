@@ -14,8 +14,16 @@ from dataclasses import dataclass
 from huggingface_hub import hf_hub_download, snapshot_download
 from huggingface_hub.utils import HfHubHTTPError
 
-from src.utils.logger import PrismaLogger
-from src.ui.theme import CONFIG
+try:
+    from src.utils.logger import PrismaLogger
+    from src.ui.theme import CONFIG
+except ImportError:
+    # Fallback for direct module testing
+    import sys
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+    from src.utils.logger import PrismaLogger
+    from src.ui.theme import CONFIG
 
 logger = PrismaLogger("Downloader")
 

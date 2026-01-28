@@ -14,11 +14,11 @@ from src.ui.components import (
     ProgressIndicator,
     StatusBar,
 )
-from src.ui.layout import MainLayout
+from src.ui.app_layout import build_app_ui, UIState
 
 __all__ = [
     "COLORS",
-    "TYPOGRAPHY", 
+    "TYPOGRAPHY",
     "SPACING",
     "CONFIG",
     "PrismaButton",
@@ -28,5 +28,6 @@ __all__ = [
     "DragDropZone",
     "ProgressIndicator",
     "StatusBar",
-    "MainLayout",
+    "build_app_ui",
+    "UIState",
 ]
