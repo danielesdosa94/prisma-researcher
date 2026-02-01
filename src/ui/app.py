@@ -5,9 +5,15 @@ import os
 import nest_asyncio
 from pathlib import Path
 
-# --- APLICAR PARCHE ASYNCIO (CRÍTICO PARA STREAMLIT + PLAYWRIGHT) ---
-nest_asyncio.apply()  
-# ---------------------------------------------------------------------
+# --- CONFIGURACIÓN CRÍTICA PARA WINDOWS + PLAYWRIGHT ---
+# Windows necesita 'ProactorEventLoop' para lanzar subprocesos (el navegador).
+# Streamlit a veces usa 'SelectorEventLoop' por defecto, lo que causa el error "NotImplementedError".
+if sys.platform.startswith("win"):
+    asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
+
+# Aplicar parche para permitir bucles anidados (necesario para Streamlit)
+nest_asyncio.apply()
+# -------------------------------------------------------
 
 # --- CONFIGURACIÓN DE PATH ---
 # Truco para que encuentre tus módulos de backend
