@@ -196,7 +196,7 @@ class AIAnalyzer:
         
         Args:
             content: Text content to analyze
-            custom_prompt: Optional custom analysis prompt
+            custom_prompt: Optional custom analysis prompt instructions
         
         Returns:
             AnalysisResult with summary and insights
@@ -217,17 +217,16 @@ class AIAnalyzer:
             content = content[:max_content_chars]
             logger.warning(f"Content truncated to {max_content_chars} chars")
         
-        # Build prompt
-        user_prompt = custom_prompt or f"""Analiza el siguiente contenido de investigación y genera un informe estructurado:
+        # Build prompt: Instructions + Content
+        # FIX: Ensure content is always appended to the instructions
+        base_instruction = custom_prompt or "Analiza el siguiente contenido de investigación y genera un informe estructurado:"
+        
+        user_prompt = f"""{base_instruction}
 
 ---
+CONTENIDO A ANALIZAR:
 {content}
----
-
-Genera un informe con:
-1. **Resumen Ejecutivo** (2-3 párrafos)
-2. **Puntos Clave** (lista de 5-7 hallazgos principales)
-3. **Conclusiones y Recomendaciones**"""
+---"""
         
         messages = [
             {"role": "system", "content": ANALYSIS_SYSTEM_PROMPT},
@@ -301,11 +300,8 @@ Genera un informe con:
             truncated = content[:3000] if len(content) > 3000 else content
             combined += f"\n## Fuente {i}\n{truncated}\n"
         
-        # Generate report
+        # Generate report instructions (Content is passed separately now)
         custom_prompt = f"""Eres un investigador profesional. Analiza las {len(scraped_contents)} fuentes proporcionadas sobre "{topic}" y genera un informe de investigación completo.
-
-CONTENIDO A ANALIZAR:
-{combined}
 
 GENERA UN INFORME CON:
 1. **Resumen Ejecutivo**: Síntesis de 2-3 párrafos de los hallazgos principales
