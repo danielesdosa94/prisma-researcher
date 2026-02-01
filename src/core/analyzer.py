@@ -192,7 +192,7 @@ class AIAnalyzer:
         custom_prompt: Optional[str] = None
     ) -> AnalysisResult:
         """
-        Analyze content using the LLM.
+        Analyze content using the LLM with smart truncation to fit context window.
         
         Args:
             content: Text content to analyze
@@ -208,17 +208,34 @@ class AIAnalyzer:
                 error="Model not loaded. Call load_model() first."
             )
         
-        # Truncate content if too long (reserve space for prompt and response)
-        max_content_tokens = self.config.n_ctx - 1000
-        # Rough estimate: 1 token ≈ 4 chars
-        max_content_chars = max_content_tokens * 4
+        # --- LÓGICA DE RECORTE SEGURA (DINÁMICA) ---
+        total_ctx = self.config.n_ctx          # Ej: 4096
+        max_output = self.config.max_tokens    # Ej: 2048
+        safety_margin = 200                    # Para wrappers y system prompt
         
+        # 1. Calcular espacio disponible para entrada
+        available_input_tokens = total_ctx - max_output - safety_margin
+        
+        # 2. Balancear si el espacio de entrada es muy pequeño
+        # Si queda menos de 1000 tokens para leer, sacrificamos tokens de salida para permitir lectura
+        if available_input_tokens < 1000:
+            logger.warning("Configuración desbalanceada: Reduciendo max_tokens para permitir más entrada.")
+            # Aseguramos al menos 2500 tokens para entrada
+            target_input = min(2500, total_ctx - safety_margin - 500) 
+            max_output = total_ctx - target_input - safety_margin
+            available_input_tokens = target_input
+            
+        # 3. Convertir a caracteres (estimación conservadora: 1 token ≈ 3 chars para español/código)
+        max_content_chars = int(available_input_tokens * 3)
+        
+        # 4. Truncar contenido
         if len(content) > max_content_chars:
-            content = content[:max_content_chars]
-            logger.warning(f"Content truncated to {max_content_chars} chars")
+            logger.warning(f"Contenido extenso ({len(content)} chars). Recortando a {max_content_chars} chars para ajustar a memoria.")
+            # Mantenemos el inicio, que suele ser la introducción/resumen
+            content = content[:max_content_chars] + "\n\n...[CONTENIDO TRUNCADO POR LÍMITE DE MEMORIA DEL MODELO]..."
+        # -----------------------------------------------------------
         
         # Build prompt: Instructions + Content
-        # FIX: Ensure content is always appended to the instructions
         base_instruction = custom_prompt or "Analiza el siguiente contenido de investigación y genera un informe estructurado:"
         
         user_prompt = f"""{base_instruction}
@@ -233,7 +250,7 @@ CONTENIDO A ANALIZAR:
             {"role": "user", "content": user_prompt}
         ]
         
-        logger.ai("Starting analysis...")
+        logger.ai(f"Starting analysis (Input ~{len(content)} chars, Max Output {max_output} tokens)...")
         self._notify("Generando análisis...")
         
         try:
@@ -243,7 +260,7 @@ CONTENIDO A ANALIZAR:
             def generate_sync():
                 return self._model.create_chat_completion(
                     messages=messages,
-                    max_tokens=self.config.max_tokens,
+                    max_tokens=max_output, # Usamos el valor ajustado dinámicamente
                     temperature=self.config.temperature,
                     top_p=self.config.top_p,
                     top_k=self.config.top_k,
@@ -266,6 +283,15 @@ CONTENIDO A ANALIZAR:
             )
             
         except Exception as e:
+            # Captura específica para errores de contexto
+            error_msg = str(e)
+            if "exceed context window" in error_msg:
+                 logger.error("Context window exceeded.")
+                 return AnalysisResult(
+                    success=False,
+                    error="El contenido es demasiado extenso incluso tras el recorte. Intenta con un texto más corto o aumenta n_ctx si el modelo lo soporta.",
+                )
+
             logger.error(f"Analysis failed: {e}")
             return AnalysisResult(
                 success=False,
