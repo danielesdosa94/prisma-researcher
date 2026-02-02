@@ -31,7 +31,7 @@ class AnalysisConfig:
     # Model parameters
     n_ctx: int = 4096          # Context window size
     n_threads: int = 4         # CPU threads to use
-    n_gpu_layers: int = 0      # GPU layers (0 = CPU only)
+    n_gpu_layers: int = -1      # GPU layers (If there is a GPU available use it)
     
     # Generation parameters
     max_tokens: int = 2048     # Max output tokens
